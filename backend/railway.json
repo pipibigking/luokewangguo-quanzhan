@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "main.py",
+      "use": "python",
+      "settings": {
+        "port": 8004,
+        "startCommand": "uvicorn main:app --host 0.0.0.0 --port 8004"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "main.py"
+    }
+  ]
+}
