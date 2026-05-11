@@ -1,0 +1,49 @@
+name: 自动上传项目到 GitHub
+description: 自动将当前项目的所有更新提交、推送至GitHub仓库，并同步更新Railway后端
+version: 1.0.0
+author: pipibigking
+skills:
+  - name: git_pull
+    description: 从远程仓库拉取最新代码
+  - name: git_status
+    description: 检查当前Git状态
+  - name: git_add
+    description: 添加文件到暂存区
+  - name: git_commit
+    description: 提交更改
+  - name: git_push
+    description: 推送到远程仓库
+  - name: check_railway
+    description: 检查Railway部署状态
+  - name: deploy_railway
+    description: 部署更新到Railway
+
+steps:
+  - name: 检查项目状态
+    type: git_status
+    description: 查看当前项目的Git状态
+
+  - name: 拉取最新代码
+    type: git_pull
+    description: 从远程仓库拉取最新代码，避免冲突
+    skip_on_error: true
+
+  - name: 添加所有更改
+    type: git_add
+    description: 添加所有更改的文件到暂存区
+    files: .
+
+  - name: 提交更改
+    type: git_commit
+    description: 提交更改到本地仓库
+    message: "自动更新项目 - {{datetime}}"
+
+  - name: 推送到GitHub
+    type: git_push
+    description: 将代码推送到GitHub远程仓库
+    branch: main
+
+  - name: 部署到Railway
+    type: deploy_railway
+    description: 触发Railway重新部署（如有配置）
+    skip_on_error: true
