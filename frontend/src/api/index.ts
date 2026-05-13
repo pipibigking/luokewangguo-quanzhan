@@ -51,27 +51,27 @@ export async function updatePet(id: number, pet: Partial<Pet>): Promise<Pet> {
 export async function deletePet(id: number): Promise<void> {
   await api.delete(`/pets/${id}`)
 }
-
+// 切换宠物状态 API
 export async function togglePetActive(id: number): Promise<Pet> {
   const response = await api.patch(`/pets/${id}/toggle-active`)
   return response.data
 }
-
+// 批量激活宠物 API
 export async function batchActivatePets(): Promise<{ message: string; count: number }> {
   const response = await api.patch('/pets/batch-activate')
   return response.data
 }
-
+// 批量停用宠物 API
 export async function batchDeactivatePets(): Promise<{ message: string; count: number }> {
   const response = await api.patch('/pets/batch-deactivate')
   return response.data
 }
-
+// 获取公告 API
 export async function getAnnouncement(): Promise<Announcement> {
   const response = await api.get('/announcement')
   return response.data
 }
-
+// 更新公告 API
 export async function updateAnnouncement(content: { content: string }): Promise<Announcement> {
   const response = await api.put('/announcement', content)
   return response.data
@@ -82,10 +82,34 @@ export async function getGroupColors(): Promise<Record<string, string>> {
   const response = await api.get('/group-colors')
   return response.data
 }
-
+// 更新分组颜色 API
 export async function updateGroupColor(groupName: string, color: string): Promise<{ group_name: string; color: string }> {
   const response = await api.put(`/group-colors/${encodeURIComponent(groupName)}`, { color })
   return response.data
+}
+
+export async function renameGroup(groupName: string, newName: string): Promise<{ message: string; old_name: string; new_name: string }> {
+  const response = await api.put(`/groups/${encodeURIComponent(groupName)}`, { new_name: newName })
+  return response.data
+}
+
+export async function batchUpdateSortOrder(items: { id: number; sort_order: number }[]): Promise<{ message: string; count: number }> {
+  const safeItems = items.map(item => ({
+    id: Number(item.id),
+    sort_order: Number(item.sort_order)
+  }))
+  const res = await fetch('/api/pets/sort-order', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items: safeItems })
+  })
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({ detail: res.statusText }))
+    const error: any = new Error('Request failed')
+    error.response = { status: res.status, data: errData }
+    throw error
+  }
+  return res.json()
 }
 
 // 管理员账号 API
@@ -95,7 +119,7 @@ export interface AdminAccount {
   created_at: string
   updated_at: string
 }
-
+// 获取管理员账号 API
 export async function getAdminAccounts(): Promise<AdminAccount[]> {
   const response = await api.get('/admin/accounts')
   return response.data

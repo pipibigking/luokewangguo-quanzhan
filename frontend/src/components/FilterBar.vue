@@ -51,17 +51,34 @@ const handleSearchChange = (e: Event) => {
   }, 300)
 }
 
-const toggleSortOrder = () => {
+const setSortDefault = () => {
   isUpdating.value = true
   emit('update:filterOptions', {
     ...props.filterOptions,
-    sortOrder: props.filterOptions.sortOrder === 'asc' ? 'desc' : 'asc'
+    sortBy: 'sort_order',
+    sortOrder: 'asc'
   })
   setTimeout(() => { isUpdating.value = false }, 200)
 }
 
-const getSortLabel = () => {
-  return props.filterOptions.sortOrder === 'asc' ? '价格升序' : '价格降序'
+const setSortPriceAsc = () => {
+  isUpdating.value = true
+  emit('update:filterOptions', {
+    ...props.filterOptions,
+    sortBy: 'price',
+    sortOrder: 'asc'
+  })
+  setTimeout(() => { isUpdating.value = false }, 200)
+}
+
+const setSortPriceDesc = () => {
+  isUpdating.value = true
+  emit('update:filterOptions', {
+    ...props.filterOptions,
+    sortBy: 'price',
+    sortOrder: 'desc'
+  })
+  setTimeout(() => { isUpdating.value = false }, 200)
 }
 
 const getAttributeIconStyle = (attr: string) => {
@@ -154,13 +171,30 @@ const getAttributeIconStyle = (attr: string) => {
 
     <!-- 排序 -->
     <div class="sort-section">
-      <button
-        @click="toggleSortOrder"
-        class="sort-button"
-        :class="{ isUpdating }"
-      >
-        {{ getSortLabel() }}
-      </button>
+      <span class="filter-label">排序</span>
+      <div class="sort-button-group">
+        <button
+          @click="setSortDefault"
+          class="sort-button"
+          :class="{ active: filterOptions.sortBy === 'sort_order', isUpdating }"
+        >
+          默认排序
+        </button>
+        <button
+          @click="setSortPriceAsc"
+          class="sort-button"
+          :class="{ active: filterOptions.sortBy === 'price' && filterOptions.sortOrder === 'asc', isUpdating }"
+        >
+          价格升序
+        </button>
+        <button
+          @click="setSortPriceDesc"
+          class="sort-button"
+          :class="{ active: filterOptions.sortBy === 'price' && filterOptions.sortOrder === 'desc', isUpdating }"
+        >
+          价格降序
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -367,19 +401,24 @@ const getAttributeIconStyle = (attr: string) => {
 .sort-section {
   display: flex;
   align-items: center;
+  gap: 14px;
+}
+
+.sort-button-group {
+  display: flex;
+  gap: 8px;
 }
 
 .sort-button {
-  padding: 14px 32px;
+  padding: 10px 24px;
   border-radius: 24px;
-  font-size: 15px;
-  font-weight: 800;
-  border: none;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  border: 2px solid #e2e8f0;
+  background: white;
+  color: #475569;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   letter-spacing: 0.3px;
   position: relative;
   overflow: hidden;
@@ -401,8 +440,18 @@ const getAttributeIconStyle = (attr: string) => {
 }
 
 .sort-button:hover {
+  border-color: #3b82f6;
+  color: #1a1a2e;
   transform: translateY(-3px);
-  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
+}
+
+.sort-button.active {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45);
+  animation: pulse-glow 2s ease-in-out infinite;
 }
 
 .isUpdating {

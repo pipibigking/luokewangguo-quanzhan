@@ -21,6 +21,275 @@ const canvasBgRef = ref<HTMLCanvasElement | null>(null)
 const canvasSnowRef = ref<HTMLCanvasElement | null>(null)
 const titleRef = ref<HTMLElement | null>(null)
 const titleIconSrc = '/images/balls/棱镜球.png'
+const prismBallRef = ref<HTMLElement | null>(null)
+
+// ──── 棱镜球 Animatable 交互（参照 animejs createAnimatable + Draggable） ────
+const prismState = reactive({
+    following: false,
+    originX: 0,
+    originY: 0,
+    currentX: 0,
+    currentY: 0,
+    targetX: 0,
+    targetY: 0,
+    velocityX: 0,
+    velocityY: 0,
+    rafId: 0,
+    rotation: 0,
+    scale: 1,
+    trailDots: [] as { x: number; y: number; age: number; hue: number }[],
+    bounceScale: 1,
+    bounceDecay: 0
+})
+
+const PRISM_SIZE = 72
+const ROTATION_SPEED = 360 / 60 // 360°/s at 60fps = 6°/frame
+const FOLLOW_EASE = 0.08
+const BOUNCE_RESTITUTION = 0.6
+let prismOriginalParent: HTMLElement | null = null
+let prismPlaceholder: HTMLElement | null = null
+
+function onPrismBallClick(e: MouseEvent) {
+    e.stopPropagation()
+    if (prismState.following) {
+        prismReturnHome()
+    } else {
+        prismStartFollow()
+    }
+}
+
+function prismStartFollow() {
+    const el = prismBallRef.value
+    if (!el) return
+
+    const rect = el.getBoundingClientRect()
+    prismState.originX = rect.left + rect.width / 2
+    prismState.originY = rect.top + rect.height / 2
+    prismState.currentX = prismState.originX
+    prismState.currentY = prismState.originY
+    prismState.targetX = prismState.originX
+    prismState.targetY = prismState.originY
+    prismState.velocityX = 0
+    prismState.velocityY = 0
+    prismState.following = true
+    prismState.scale = 1.15
+    prismState.rotation = 0
+    prismState.trailDots = []
+    prismState.bounceScale = 1
+    prismState.bounceDecay = 0
+
+    // 用占位元素保持 header 布局不变
+    prismPlaceholder = document.createElement('div')
+    prismPlaceholder.id = 'prism-placeholder'
+    prismPlaceholder.style.cssText = `width:${PRISM_SIZE}px;height:${PRISM_SIZE}px;margin-bottom:8px;visibility:hidden;`
+    el.parentNode!.insertBefore(prismPlaceholder, el)
+
+    // 把球从 header 移到 body，突破 overflow:hidden 裁剪
+    prismOriginalParent = el.parentNode as HTMLElement
+    document.body.appendChild(el)
+
+    el.style.animation = 'none'
+    el.style.position = 'fixed'
+    el.style.zIndex = '999999'
+    el.style.pointerEvents = 'auto'
+    el.style.margin = '0'
+    el.style.left = (prismState.originX - PRISM_SIZE / 2) + 'px'
+    el.style.top = (prismState.originY - PRISM_SIZE / 2) + 'px'
+    el.style.filter = 'none'
+
+    window.addEventListener('mousemove', prismOnMouseMove)
+    document.addEventListener('mousedown', prismOnDocClick)
+    prismAnimate()
+}
+
+function prismOnMouseMove(e: MouseEvent) {
+    prismState.targetX = e.clientX
+    prismState.targetY = e.clientY
+}
+
+function prismOnDocClick(e: MouseEvent) {
+    const el = prismBallRef.value
+    if (!el || !prismState.following) return
+    if (el.contains(e.target as Node)) return
+    prismReturnHome()
+}
+
+function prismAnimate() {
+    if (!prismState.following) return
+
+    const prevX = prismState.currentX
+    const prevY = prismState.currentY
+
+    const dx = prismState.targetX - prismState.currentX
+    const dy = prismState.targetY - prismState.currentY
+    prismState.velocityX = dx * FOLLOW_EASE
+    prismState.velocityY = dy * FOLLOW_EASE
+    prismState.currentX += prismState.velocityX
+    prismState.currentY += prismState.velocityY
+
+    // 边界碰撞检测
+    const halfSize = PRISM_SIZE / 2
+    const winW = window.innerWidth
+    const winH = window.innerHeight
+    let bounced = false
+
+    if (prismState.currentX - halfSize < 0) {
+        prismState.currentX = halfSize
+        prismState.velocityX = Math.abs(prismState.velocityX) * BOUNCE_RESTITUTION
+        prismState.targetX = halfSize + 20
+        bounced = true
+    } else if (prismState.currentX + halfSize > winW) {
+        prismState.currentX = winW - halfSize
+        prismState.velocityX = -Math.abs(prismState.velocityX) * BOUNCE_RESTITUTION
+        prismState.targetX = winW - halfSize - 20
+        bounced = true
+    }
+
+    if (prismState.currentY - halfSize < 0) {
+        prismState.currentY = halfSize
+        prismState.velocityY = Math.abs(prismState.velocityY) * BOUNCE_RESTITUTION
+        prismState.targetY = halfSize + 20
+        bounced = true
+    } else if (prismState.currentY + halfSize > winH) {
+        prismState.currentY = winH - halfSize
+        prismState.velocityY = -Math.abs(prismState.velocityY) * BOUNCE_RESTITUTION
+        prismState.targetY = winH - halfSize - 20
+        bounced = true
+    }
+
+    if (bounced) {
+        prismState.bounceScale = 0.8
+        prismState.bounceDecay = 10
+    }
+
+    // 碰撞弹性恢复
+    if (prismState.bounceDecay > 0) {
+        prismState.bounceDecay--
+        prismState.bounceScale += (1 - prismState.bounceScale) * 0.2
+    } else {
+        prismState.bounceScale += (1 - prismState.bounceScale) * 0.1
+    }
+
+    // 持续旋转：360°/s
+    prismState.rotation = (prismState.rotation + ROTATION_SPEED) % 360
+
+    const el = prismBallRef.value
+    if (el) {
+        el.style.left = (prismState.currentX - PRISM_SIZE / 2) + 'px'
+        el.style.top = (prismState.currentY - PRISM_SIZE / 2) + 'px'
+        el.style.transform = `scale(${prismState.scale * prismState.bounceScale}) rotate(${prismState.rotation}deg)`
+        el.style.filter = 'none'
+    }
+
+    // 拖尾粒子
+    const moveDx = prismState.currentX - prevX
+    const moveDy = prismState.currentY - prevY
+    if (Math.abs(moveDx) > 1 || Math.abs(moveDy) > 1) {
+        prismState.trailDots.push({
+            x: prismState.currentX,
+            y: prismState.currentY,
+            age: 0,
+            hue: (prismState.rotation / 360 * 360) % 360
+        })
+    }
+    if (prismState.trailDots.length > 45) {
+        prismState.trailDots.shift()
+    }
+    prismRenderTrail()
+
+    prismState.rafId = requestAnimationFrame(prismAnimate)
+}
+
+function prismRenderTrail() {
+    document.querySelectorAll('.prism-trail').forEach(el => el.remove())
+
+    prismState.trailDots.forEach((dot) => {
+        dot.age++
+        const opacity = Math.max(0, 1 - dot.age / 35)
+        const size = Math.max(3, 14 - dot.age * 0.28)
+        if (opacity <= 0) return
+
+        const d = document.createElement('div')
+        d.className = 'prism-trail'
+        d.style.cssText = `
+            position:fixed;z-index:999998;pointer-events:none;
+            width:${size}px;height:${size}px;border-radius:50%;
+            background:hsla(${dot.hue},90%,65%,${opacity});
+            box-shadow:0 0 ${size * 2}px hsla(${dot.hue},80%,55%,${opacity * 0.7});
+            left:${dot.x - size / 2}px;top:${dot.y - size / 2}px;
+        `
+        document.body.appendChild(d)
+    })
+
+    prismState.trailDots = prismState.trailDots.filter(d => d.age < 35)
+}
+
+function prismReturnHome() {
+    prismState.following = false
+    window.removeEventListener('mousemove', prismOnMouseMove)
+    document.removeEventListener('mousedown', prismOnDocClick)
+    cancelAnimationFrame(prismState.rafId)
+
+    document.querySelectorAll('.prism-trail').forEach(el => el.remove())
+    prismState.trailDots = []
+
+    const el = prismBallRef.value
+    if (!el) return
+
+    prismState.targetX = prismState.originX
+    prismState.targetY = prismState.originY
+
+    let frame = 0
+    const totalFrames = 50
+
+    function springBack() {
+        if (!el) return
+        frame++
+        const progress = frame / totalFrames
+        const ease = 0.1
+        const dx = prismState.targetX - prismState.currentX
+        const dy = prismState.targetY - prismState.currentY
+        prismState.currentX += dx * ease
+        prismState.currentY += dy * ease
+
+        // 持续旋转（减速）
+        prismState.rotation = (prismState.rotation + ROTATION_SPEED * (1 - progress * 0.7)) % 360
+
+        const scaleVal = prismState.scale * (1 + Math.sin(progress * Math.PI) * 0.1)
+        el.style.left = (prismState.currentX - PRISM_SIZE / 2) + 'px'
+        el.style.top = (prismState.currentY - PRISM_SIZE / 2) + 'px'
+        el.style.transform = `scale(${scaleVal}) rotate(${prismState.rotation}deg)`
+        el.style.filter = 'none'
+
+        if (frame < totalFrames && (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5)) {
+            requestAnimationFrame(springBack)
+        } else {
+            el.style.position = ''
+            el.style.zIndex = ''
+            el.style.left = ''
+            el.style.top = ''
+            el.style.margin = ''
+            el.style.transform = ''
+            el.style.filter = ''
+            el.style.transition = ''
+            el.style.animation = ''
+
+            // 把球从 body 移回 header 原位，再删除占位元素
+            const placeholder = document.getElementById('prism-placeholder')
+            if (prismOriginalParent && placeholder) {
+                prismOriginalParent.insertBefore(el, placeholder)
+                prismOriginalParent = null
+            } else if (prismOriginalParent) {
+                prismOriginalParent.appendChild(el)
+                prismOriginalParent = null
+            }
+            if (placeholder) placeholder.remove()
+            prismPlaceholder = null
+        }
+    }
+
+    springBack()
+}
 
 /* ======== 背景粒子连线网络 ======== */
 interface NetParticle {
@@ -263,7 +532,7 @@ function destroyHeaderSnow() {
 const filterOptions = reactive<FilterOptions>({
   group: null,
   search: '',
-  sortBy: 'price',
+  sortBy: 'sort_order',
   sortOrder: 'asc',
   attribute: null
 })
@@ -294,7 +563,7 @@ const filteredPets = computed(() => {
   
   if (filterOptions.attribute) {
     result = result.filter(pet => 
-      pet.attributes && pet.attributes.includes(filterOptions.attribute)
+      pet.attributes && filterOptions.attribute && pet.attributes.includes(filterOptions.attribute)
     )
   }
   
@@ -304,6 +573,14 @@ const filteredPets = computed(() => {
         return a.price - b.price
       } else {
         return b.price - a.price
+      }
+    })
+  } else if (filterOptions.sortBy === 'sort_order') {
+    result.sort((a, b) => {
+      if (filterOptions.sortOrder === 'asc') {
+        return a.sort_order - b.sort_order
+      } else {
+        return b.sort_order - a.sort_order
       }
     })
   }
@@ -383,7 +660,7 @@ onUnmounted(() => {
       <!-- Header 织梦棱镜球雪花画布 -->
       <canvas ref="canvasSnowRef" class="snow-canvas"></canvas>
       <div class="header-content">
-        <img class="title-icon" :src="titleIconSrc" alt="棱镜球" />
+        <img ref="prismBallRef" class="title-icon" :src="titleIconSrc" alt="棱镜球" @click="onPrismBallClick" />
         <h1 ref="titleRef" class="header-title">
           <span 
             v-for="(item, index) in titleChars" 
@@ -598,27 +875,28 @@ body {
   height: 72px;
   object-fit: contain;
   margin-bottom: 8px;
-  filter: drop-shadow(0 0 30px rgba(96, 165, 250, 0.9)) drop-shadow(0 0 60px rgba(59, 130, 246, 0.5));
-  animation: iconFloat 3s ease-in-out infinite;
   z-index: 10;
+  cursor: pointer;
+  will-change: transform, left, top;
+}
+
+.title-icon:hover {
+  animation: iconFloat 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 20px rgba(96, 165, 250, 0.6));
 }
 
 @keyframes iconFloat {
   0%, 100% { 
     transform: translateY(0) scale(1) rotate(0deg); 
-    filter: drop-shadow(0 0 30px rgba(96, 165, 250, 0.9)) drop-shadow(0 0 60px rgba(59, 130, 246, 0.5));
   }
   25% { 
-    transform: translateY(-15px) scale(1.1) rotate(-8deg); 
-    filter: drop-shadow(0 0 40px rgba(96, 165, 250, 1)) drop-shadow(0 0 80px rgba(59, 130, 246, 0.6));
+    transform: translateY(-12px) scale(1.08) rotate(-6deg); 
   }
   50% { 
-    transform: translateY(-8px) scale(1.05) rotate(0deg); 
-    filter: drop-shadow(0 0 35px rgba(96, 165, 250, 0.95)) drop-shadow(0 0 70px rgba(59, 130, 246, 0.55));
+    transform: translateY(-6px) scale(1.04) rotate(0deg); 
   }
   75% { 
-    transform: translateY(-15px) scale(1.1) rotate(8deg); 
-    filter: drop-shadow(0 0 40px rgba(96, 165, 250, 1)) drop-shadow(0 0 80px rgba(59, 130, 246, 0.6));
+    transform: translateY(-12px) scale(1.08) rotate(6deg); 
   }
 }
 

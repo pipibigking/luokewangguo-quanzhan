@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch, computed } from 'vue'
-import { getPets, getGroups, createPet, updatePet, deletePet, togglePetActive, batchActivatePets, batchDeactivatePets } from '@/api'
+import { ref, reactive, onMounted, watch, computed, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { getPets, getGroups, createPet, updatePet, deletePet, togglePetActive, batchActivatePets, batchDeactivatePets, renameGroup, batchUpdateSortOrder } from '@/api'
 import type { Pet } from '@/types'
 import { getGroupColor as getGroupColorUtil, loadGroupColors, saveGroupColor, initGroupColors } from '@/utils/groupColors'
 import { getAttributeIconPath } from '@/utils/attributeIcons'
+
+const route = useRoute()
+const router = useRouter()
 
 const ATTRIBUTES = ['普', '草', '火', '水', '光', '地', '冰', '龙', '电', '毒', '虫', '武', '翼', '萌', '幽', '恶', '机', '幻']
 
@@ -70,14 +74,309 @@ const formSubmitting = ref(false)
 const deleteSubmitting = ref(false)
 const batchSubmitting = ref(false)
 
-const sortBy = ref('id')
+// 内联编辑价格相关
+const editingPricePetId = ref<number | null>(null)
+const editingPriceValue = ref('')
+
+// ═════════════════════════════════════════════════
+//  拖拽排序 — 参照 animejs Draggable + Spring 物理
+//  生命周期: onGrab → onDrag → onRelease → onSettle
+// ═════════════════════════════════════════════════
+const drag = {
+    active: false,
+    petId: 0,
+    fromIndex: -1,
+    targetIndex: -1,
+    startY: 0,
+    lastY: 0,
+    velocity: 0,
+    rowHeight: 0,
+    tableRect: null as DOMRect | null,
+    clone: null as HTMLElement | null,
+    sourceRow: null as HTMLElement | null,
+    gapRows: [] as HTMLElement[],
+    settleTimer: 0 as any
+}
+
+const GAP_HEIGHT = 4
+const SPRING_EASE = 'cubic-bezier(0.34, 1.56, 0.64, 1)'
+const SETTLE_DURATION = 350
+const CLONE_SCALE = 1.03
+const GHOST_OPACITY = '0.3'
+
+function initDragHandles() {
+    nextTick(() => {
+        document.querySelectorAll('.drag-handle').forEach(el => {
+            const fresh = el.cloneNode(true) as HTMLElement
+            el.parentNode?.replaceChild(fresh, el)
+            fresh.addEventListener('pointerdown', onGrab as any)
+        })
+    })
+}
+
+// ── 阶段1: onGrab ──
+function onGrab(e: PointerEvent) {
+    const row = (e.target as HTMLElement).closest('tr.pet-row') as HTMLElement
+    if (!row) return
+    const pid = Number(row.getAttribute('data-pet-id'))
+    const idx = filteredPets.value.findIndex(p => p.id === pid)
+    if (idx < 0 || !pid) return
+
+    e.preventDefault()
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+
+    const rect = row.getBoundingClientRect()
+
+    drag.active = true
+    drag.petId = pid
+    drag.fromIndex = idx
+    drag.targetIndex = idx
+    drag.startY = e.clientY
+    drag.lastY = e.clientY
+    drag.velocity = 0
+    drag.rowHeight = rect.height
+    drag.tableRect = row.closest('.table-wrapper')!.getBoundingClientRect()
+    drag.sourceRow = row
+    drag.gapRows = []
+
+    // 源行变半透明（ghost）
+    row.style.transition = 'opacity 0.15s'
+    row.style.opacity = GHOST_OPACITY
+
+    // 创建浮动克隆
+    const clone = row.cloneNode(true) as HTMLElement
+    clone.style.cssText = `
+        position:fixed;z-index:9999;pointer-events:none;
+        left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;
+        box-shadow:0 12px 40px rgba(0,0,0,0.28),0 0 0 2px rgba(99,102,241,0.3);
+        transform:scale(${CLONE_SCALE});border-radius:12px;
+        transition:box-shadow 0.2s;
+    `
+    document.body.appendChild(clone)
+    drag.clone = clone
+
+    document.addEventListener('pointermove', onDrag)
+    document.addEventListener('pointerup', onRelease)
+    document.addEventListener('pointercancel', onRelease)
+}
+
+// ── 阶段2: onDrag ──
+function onDrag(e: PointerEvent) {
+    if (!drag.active || !drag.clone) return
+
+    drag.velocity = e.clientY - drag.lastY
+    drag.lastY = e.clientY
+    const dy = e.clientY - drag.startY
+
+    drag.clone.style.transition = 'none'
+    drag.clone.style.transform = `translateY(${dy}px) scale(${CLONE_SCALE})`
+    drag.clone.style.boxShadow = `0 16px 48px rgba(0,0,0,0.35),0 0 0 3px rgba(99,102,241,0.4)`
+
+    const rows = document.querySelectorAll('tr.pet-row') as NodeListOf<HTMLElement>
+    let newTarget = drag.fromIndex
+    for (let i = 0; i < rows.length; i++) {
+        if (i === drag.fromIndex) continue
+        const r = rows[i].getBoundingClientRect()
+        const mid = r.top + r.height / 2
+        if (e.clientY < mid) {
+            newTarget = i
+            break
+        }
+        newTarget = i
+    }
+
+    if (newTarget !== drag.targetIndex) {
+        drag.targetIndex = newTarget
+        updateGaps(rows)
+    }
+}
+
+// 为被跨越的行添加 transform 偏移以产生"让位"动画
+function updateGaps(rows: NodeListOf<HTMLElement>) {
+    // 清除旧偏移
+    drag.gapRows.forEach(r => {
+        r.style.transition = 'transform 0.2s cubic-bezier(0.2,0,0,1)'
+        r.style.transform = ''
+    })
+    drag.gapRows = []
+
+    const from = drag.fromIndex
+    const to = drag.targetIndex
+    if (from === to) return
+
+    const dist = drag.rowHeight + GAP_HEIGHT * 2
+
+    if (to < from) {
+        // 向上拖：from之前、to及之后的行向下偏移
+        for (let i = to; i < from; i++) {
+            const r = rows[i] as HTMLElement
+            if (r === drag.sourceRow) continue
+            r.style.transition = 'transform 0.2s cubic-bezier(0.2,0,0,1)'
+            r.style.transform = `translateY(${dist}px)`
+            drag.gapRows.push(r)
+        }
+    } else {
+        // 向下拖：from之后、to及之前的行向上偏移
+        for (let i = from + 1; i <= to; i++) {
+            const r = rows[i] as HTMLElement
+            r.style.transition = 'transform 0.2s cubic-bezier(0.2,0,0,1)'
+            r.style.transform = `translateY(-${dist}px)`
+            drag.gapRows.push(r)
+        }
+    }
+}
+
+// ── 阶段3: onRelease → onSettle ──
+function onRelease() {
+    if (!drag.active) return
+    drag.active = false
+
+    document.removeEventListener('pointermove', onDrag)
+    document.removeEventListener('pointerup', onRelease)
+    document.removeEventListener('pointercancel', onRelease)
+
+    clearTimeout(drag.settleTimer)
+
+    // 清除所有 gap 动画，让行回到原位
+    drag.gapRows.forEach(r => {
+        r.style.transition = 'transform 0.15s cubic-bezier(0.2,0,0,1)'
+        r.style.transform = ''
+    })
+
+    if (drag.clone) {
+        const clone = drag.clone
+
+        // Spring-settle 动画：克隆滑入目标位置
+        clone.style.transition = `transform ${SETTLE_DURATION}ms ${SPRING_EASE}, opacity 0.2s`
+        clone.style.transform = `translateY(0) scale(${CLONE_SCALE})`
+        clone.style.boxShadow = '0 8px 24px rgba(99,102,241,0.3),0 0 0 2px rgba(99,102,241,0.15)'
+
+        const settled = () => {
+            clone.removeEventListener('transitionend', settled)
+            if (clone.parentNode) clone.remove()
+            drag.clone = null
+            finishReorder()
+        }
+        clone.addEventListener('transitionend', settled)
+        // fallback
+        drag.settleTimer = setTimeout(settled, SETTLE_DURATION + 80)
+    } else {
+        finishReorder()
+    }
+}
+
+// ── 阶段4: 数据重排 + 保存 ──
+function finishReorder() {
+    const srcRow = drag.sourceRow
+    if (srcRow) {
+        srcRow.style.opacity = ''
+        srcRow.style.transition = 'opacity 0.3s'
+        drag.sourceRow = null
+    }
+
+    drag.gapRows.forEach(r => {
+        r.style.transform = ''
+        r.style.transition = ''
+    })
+    drag.gapRows = []
+
+    if (drag.targetIndex === drag.fromIndex) {
+        resetDragState()
+        return
+    }
+
+    const reordered = [...filteredPets.value]
+    const [moved] = reordered.splice(drag.fromIndex, 1)
+    reordered.splice(drag.targetIndex, 0, moved)
+
+    const reorderedSet = new Set(reordered.map(p => p.id))
+    const newPets: Pet[] = []
+    let ri = 0
+    for (const p of pets.value) {
+        if (reorderedSet.has(p.id)) {
+            newPets.push({ ...reordered[ri] })
+            ri++
+        } else {
+            newPets.push({ ...p })
+        }
+    }
+    newPets.forEach((p, idx) => { p.sort_order = idx })
+    pets.value = newPets
+
+    resetDragState()
+    saveSortOrder(newPets)
+}
+
+function resetDragState() {
+    drag.fromIndex = -1
+    drag.targetIndex = -1
+    drag.petId = 0
+    drag.clone = null
+    drag.sourceRow = null
+}
+
+async function saveSortOrder(newPets: Pet[]) {
+    const body = '{"items":[' + newPets.map((p, i) => '{"id":' + p.id + ',"sort_order":' + i + '}').join(',') + ']}'
+
+    try {
+        const res = await fetch('http://localhost:8004/api/pets/sort-order', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body
+        })
+        if (res.ok) {
+            showToast('排序已保存', 'success')
+        } else {
+            const errText = await res.text()
+            console.error('[拖拽] 422响应体:', errText)
+            console.error('[拖拽] 请求体前200字:', body.slice(0, 200))
+            throw new Error('status ' + res.status + ': ' + errText)
+        }
+    } catch (err) {
+        console.error('[拖拽] 保存失败:', err)
+        showToast('排序保存失败', 'error')
+        await loadPets()
+    }
+}
+
+// 分组改名相关
+const editingGroupName = ref<string | null>(null)
+const editingGroupNewName = ref('')
+
+// 草稿箱筛选
+const showDraftOnly = ref(false)
+
+const sortBy = ref('sort_order')
 const sortOrder = ref<'asc' | 'desc'>('asc')
+const defaultSortActive = ref(true)
+
+function applyDefaultSort() {
+    sortBy.value = 'sort_order'
+    sortOrder.value = 'asc'
+    defaultSortActive.value = true
+}
+
+function toggleSortBy(field: string) {
+    if (sortBy.value === field) {
+        sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+    } else {
+        sortBy.value = field
+        sortOrder.value = 'asc'
+    }
+    defaultSortActive.value = sortBy.value === 'sort_order' && sortOrder.value === 'asc'
+}
+
+// 监听路由查询参数，支持侧边栏草稿箱导航
+watch(() => route.query.draft, (val) => {
+    showDraftOnly.value = val === '1'
+}, { immediate: true })
 
 let searchTimer: number | null = null
 const debouncedSearch = ref('')
 
 function handleSearchInput(e: Event) {
     const target = e.target as HTMLInputElement
+    searchKeyword.value = target.value
     if (searchTimer) clearTimeout(searchTimer)
     searchTimer = window.setTimeout(() => {
         debouncedSearch.value = target.value
@@ -107,9 +406,23 @@ const filteredPets = computed(() => {
     if (filterAttribute.value) {
         result = result.filter(p => p.attributes.includes(filterAttribute.value!))
     }
+    if (showDraftOnly.value) {
+        result = result.filter(p => p.group === '草稿' && !p.is_active)
+    } else {
+        result = result.filter(p => !(p.group === '草稿' && !p.is_active))
+    }
     result.sort((a, b) => {
-        const va = sortBy.value === 'price' ? a.price : a.id
-        const vb = sortBy.value === 'price' ? b.price : b.id
+        let va: number, vb: number
+        if (sortBy.value === 'price') {
+            va = a.price
+            vb = b.price
+        } else if (sortBy.value === 'sort_order') {
+            va = a.sort_order
+            vb = b.sort_order
+        } else {
+            va = a.id
+            vb = b.id
+        }
         return sortOrder.value === 'asc' ? va - vb : vb - va
     })
     return result
@@ -148,8 +461,13 @@ async function loadGroups() {
 
 function openAddModal() {
     editingPetId.value = null
-    formTitle.value = '添加精灵'
+    formTitle.value = showDraftOnly.value ? '新建草稿' : '添加精灵'
     Object.assign(formData, emptyForm())
+    if (showDraftOnly.value) {
+        formData.group = ''
+        formData.is_custom_group = false
+        formData.is_active = false
+    }
     showFormModal.value = true
 }
 
@@ -168,6 +486,23 @@ function openEditModal(pet: Pet) {
     formData.custom_group = isCustom ? pet.group : ''
     formData.group = isCustom ? '' : pet.group
     formData.custom_group_color = getGroupColorUtil(pet.group)
+    showFormModal.value = true
+}
+
+function completeDraft(pet: Pet) {
+    editingPetId.value = pet.id
+    formTitle.value = '完成精灵'
+    formData.name = pet.name
+    formData.image_url = pet.image_url
+    formData.price = pet.price || 0
+    formData.attributes = pet.attributes ? [...pet.attributes] : []
+    formData.description = pet.description || ''
+    formData.abilities = pet.abilities ? [...pet.abilities] : []
+    formData.is_active = true
+    formData.is_custom_group = false
+    formData.custom_group = ''
+    formData.group = pet.group !== '草稿' ? pet.group : ''
+    formData.custom_group_color = '#6366F1'
     showFormModal.value = true
 }
 
@@ -195,10 +530,10 @@ async function handleFormSubmit() {
         }
 
         if (editingPetId.value) {
-            await updatePet(editingPetId.value, payload)
+            await updatePet(editingPetId.value, payload as any)
             showToast('精灵更新成功', 'success')
         } else {
-            await createPet(payload)
+            await createPet({ ...payload, sort_order: 0 } as any)
             showToast('精灵添加成功', 'success')
         }
         if (formData.is_custom_group) {
@@ -215,9 +550,120 @@ async function handleFormSubmit() {
     }
 }
 
+async function handleSaveDraft() {
+    if (!formData.name.trim()) return
+
+    formSubmitting.value = true
+    const draftGroup = '草稿'
+    try {
+        if (editingPetId.value) {
+            const payload: Record<string, unknown> = {
+                name: formData.name.trim(),
+                group: draftGroup,
+                is_active: false,
+                image_url: formData.image_url.trim() || ''
+            }
+            if (formData.price !== undefined) payload.price = formData.price
+            if (formData.attributes.length) payload.attributes = formData.attributes
+            if (formData.description.trim()) payload.description = formData.description.trim()
+            const abilities = formData.abilities.filter(a => a.trim())
+            if (abilities.length) payload.abilities = abilities
+
+            await updatePet(editingPetId.value, payload as Partial<Pet>)
+            showToast('精灵已存为草稿', 'success')
+        } else {
+            const payload = {
+                name: formData.name.trim(),
+                group: draftGroup,
+                image_url: formData.image_url.trim() || '',
+                price: formData.price || 0,
+                attributes: formData.attributes,
+                description: formData.description.trim() || '',
+                abilities: formData.abilities.filter(a => a.trim()),
+                is_active: false
+            }
+            await createPet(payload as Parameters<typeof createPet>[0])
+            showToast('精灵草稿已保存', 'success')
+        }
+        if (formData.is_custom_group && effectiveGroup.value) {
+            saveGroupColor(effectiveGroup.value, formData.custom_group_color)
+        }
+        closeFormModal()
+        await loadPets()
+        await loadGroups()
+    } catch (err) {
+        showToast('保存草稿失败', 'error')
+        console.error('保存草稿失败:', err)
+    } finally {
+        formSubmitting.value = false
+    }
+}
+
 function confirmDelete(pet: Pet) {
     deletingPet.value = pet
     showDeleteConfirm.value = true
+}
+
+// 内联编辑价格 - 开始编辑
+function startEditPrice(pet: Pet) {
+    editingPricePetId.value = pet.id
+    editingPriceValue.value = String(pet.price)
+}
+
+// 内联编辑价格 - 保存
+async function saveEditPrice(pet: Pet) {
+    const value = editingPriceValue.value
+    
+    // 如果值为空或没有修改，直接退出
+    if (value === '' || value === null || value === undefined) {
+        editingPricePetId.value = null
+        editingPriceValue.value = ''
+        return
+    }
+    
+    // 解析价格
+    let newPrice: number
+    if (typeof value === 'number') {
+        newPrice = value
+    } else {
+        // 先尝试直接转换，再parseInt
+        const numValue = Number(value)
+        newPrice = isNaN(numValue) ? parseInt(value, 10) : numValue
+    }
+    
+    // 验证价格有效性
+    if (isNaN(newPrice) || newPrice < 0 || !isFinite(newPrice)) {
+        editingPricePetId.value = null
+        editingPriceValue.value = ''
+        return
+    }
+    
+    try {
+        await updatePet(pet.id, { price: newPrice })
+        pet.price = newPrice
+        showToast('价格更新成功', 'success')
+    } catch (err) {
+        showToast('价格更新失败', 'error')
+        console.error('更新价格失败:', err)
+    } finally {
+        editingPricePetId.value = null
+        editingPriceValue.value = ''
+    }
+}
+
+// 内联编辑价格 - 取消编辑
+function cancelEditPrice() {
+    editingPricePetId.value = null
+    editingPriceValue.value = ''
+}
+
+// 内联编辑价格 - 按回车键保存
+function handlePriceKeydown(pet: Pet, event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+        saveEditPrice(pet)
+    } else if (event.key === 'Escape') {
+        cancelEditPrice()
+    }
 }
 
 function closeDeleteConfirm() {
@@ -250,6 +696,18 @@ async function handleToggleActive(pet: Pet) {
     } catch (err) {
         showToast('切换状态失败', 'error')
         console.error('切换状态失败:', err)
+    }
+}
+
+async function moveToDraft(pet: Pet) {
+    try {
+        await updatePet(pet.id, { is_active: false, group: '草稿' } as any)
+        showToast('已移至草稿箱', 'success')
+        await loadPets()
+        await loadGroups()
+    } catch (err) {
+        showToast('移至草稿箱失败', 'error')
+        console.error('移至草稿箱失败:', err)
     }
 }
 
@@ -324,23 +782,64 @@ async function updateGroupColor(group: string, color: string) {
     }
 }
 
+function startRenameGroup(group: string) {
+    editingGroupName.value = group
+    editingGroupNewName.value = group
+}
+
+function cancelRenameGroup() {
+    editingGroupName.value = null
+    editingGroupNewName.value = ''
+}
+
+async function submitRenameGroup(oldName: string) {
+    const newName = editingGroupNewName.value.trim()
+    if (!newName || newName === oldName) {
+        editingGroupName.value = null
+        return
+    }
+    try {
+        await renameGroup(oldName, newName)
+        showToast(`分组已重命名为 "${newName}"`, 'success')
+        editingGroupName.value = null
+        await loadPets()
+        await loadGroups()
+    } catch (err: any) {
+        const msg = err?.response?.data?.detail || '重命名失败'
+        showToast(msg, 'error')
+    }
+}
+
+function handleRenameKeydown(oldName: string, event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+        submitRenameGroup(oldName)
+    } else if (event.key === 'Escape') {
+        cancelRenameGroup()
+    }
+}
+
 watch(debouncedSearch, () => {}, { flush: 'post' })
+watch(filteredPets, () => { initDragHandles() }, { flush: 'post' })
 
 onMounted(async () => {
-    await initGroupColors() // 初始化加载分组颜色
+    await initGroupColors()
     loadPets()
     loadGroups()
+    initDragHandles()
 })
 </script>
 
 <template>
-    <div class="pet-manage-page">
+    <div class="pet-manage-page" :class="{ 'draft-mode': showDraftOnly }">
         <!-- Toast 提示 -->
         <div v-if="toastMsg" class="toast" :class="toastType">{{ toastMsg }}</div>
 
         <div class="page-header">
-            <h2 class="page-title">✨ 精灵管理</h2>
-            <div class="header-actions">
+            <h2 class="page-title">
+                {{ showDraftOnly ? '📋 草稿箱' : '✨ 精灵管理' }}
+            </h2>
+            <p v-if="showDraftOnly" class="page-subtitle">管理尚未完善的精灵草稿</p>
+            <div class="header-actions" v-if="!showDraftOnly">
                 <button class="btn-add" @click="openAddModal">
                     <span class="btn-add-icon">+</span>
                     添加精灵
@@ -360,21 +859,33 @@ onMounted(async () => {
                     📥 一键下架
                 </button>
             </div>
+            <div class="header-actions" v-else>
+                <button class="btn-back-pets" @click="router.push({ path: '/admin/pets' })">
+                    ← 精灵管理
+                </button>
+                <button class="btn-add btn-draft-add" @click="openAddModal">
+                    <span class="btn-add-icon">+</span>
+                    新建草稿
+                </button>
+                <span class="draft-count-badge">
+                    📋 共 {{ filteredPets.length }} 只草稿
+                </span>
+            </div>
         </div>
 
-        <div class="filter-bar">
+        <div class="filter-bar" :class="{ 'filter-bar-draft': showDraftOnly }">
             <div class="search-box">
                 <span class="search-icon">🔍</span>
                 <input
                     type="text"
                     :value="searchKeyword"
                     @input="handleSearchInput"
-                    placeholder="搜索精灵名称..."
+                    :placeholder="showDraftOnly ? '搜索草稿名称...' : '搜索精灵名称...'"
                     class="search-input"
                 />
             </div>
 
-            <div class="filter-group">
+            <div class="filter-group" v-if="!showDraftOnly">
                 <span class="filter-label">分组</span>
                 <select
                     :value="filterGroup || ''"
@@ -386,7 +897,7 @@ onMounted(async () => {
                 </select>
             </div>
 
-            <div class="filter-attributes">
+            <div class="filter-attributes" v-if="!showDraftOnly">
                 <span class="filter-label">属性</span>
                 <div class="attribute-buttons">
                     <button
@@ -413,10 +924,37 @@ onMounted(async () => {
                 <span class="refresh-icon">🔄</span>
                 刷新
             </button>
+
+            <div class="sort-buttons">
+                <button
+                    class="btn-sort"
+                    :class="{ active: defaultSortActive }"
+                    @click="applyDefaultSort"
+                    title="按默认顺序排列"
+                >
+                    📋 默认排序
+                </button>
+                <button
+                    class="btn-sort"
+                    :class="{ active: sortBy === 'id' }"
+                    @click="toggleSortBy('id')"
+                    :title="'按ID' + (sortBy === 'id' ? (sortOrder === 'asc' ? '升序' : '降序') : '排序')"
+                >
+                    🔢 ID{{ sortBy === 'id' ? (sortOrder === 'asc' ? '↑' : '↓') : '' }}
+                </button>
+                <button
+                    class="btn-sort"
+                    :class="{ active: sortBy === 'price' }"
+                    @click="toggleSortBy('price')"
+                    :title="'按价格' + (sortBy === 'price' ? (sortOrder === 'asc' ? '升序' : '降序') : '排序')"
+                >
+                    💰 价格{{ sortBy === 'price' ? (sortOrder === 'asc' ? '↑' : '↓') : '' }}
+                </button>
+            </div>
         </div>
 
-        <div class="group-color-manager">
-            <h3 class="section-title-text">🎨 分组颜色管理</h3>
+        <div class="group-color-manager" v-if="!showDraftOnly">
+            <h3 class="section-title-text">📂 分组管理</h3>
             <div class="color-cards-grid">
                 <div v-for="group in groups" :key="group" class="color-card">
                     <div class="color-card-header">
@@ -424,7 +962,27 @@ onMounted(async () => {
                             class="color-preview"
                             :style="{ background: getGroupColor(group) }"
                         ></span>
-                        <span class="group-name">{{ group }}</span>
+                        <span
+                            v-if="editingGroupName !== group"
+                            class="group-name group-name-editable"
+                            @dblclick="startRenameGroup(group)"
+                            :title="'双击改名'"
+                        >{{ group }}</span>
+                        <input
+                            v-else
+                            v-model="editingGroupNewName"
+                            type="text"
+                            class="group-rename-input"
+                            @keydown="handleRenameKeydown(group, $event)"
+                            @blur="submitRenameGroup(group)"
+                            ref="groupRenameInput"
+                        />
+                        <button
+                            v-if="editingGroupName !== group"
+                            class="btn-rename-group"
+                            @click="startRenameGroup(group)"
+                            title="重命名分组"
+                        >✏️</button>
                     </div>
                     <div class="color-card-body">
                         <input
@@ -453,6 +1011,8 @@ onMounted(async () => {
             <table class="pet-table">
                 <thead>
                     <tr>
+                        <th class="col-drag-handle"></th>
+                        <th class="col-row-num">#</th>
                         <th class="col-thumb">缩略图</th>
                         <th class="col-name">名称</th>
                         <th class="col-group">分组</th>
@@ -464,13 +1024,18 @@ onMounted(async () => {
                 </thead>
                 <tbody>
                     <tr v-if="filteredPets.length === 0">
-                        <td colspan="7" class="empty-row">暂无匹配的精灵数据</td>
+                        <td colspan="9" class="empty-row">暂无匹配的精灵数据</td>
                     </tr>
                     <tr
-                        v-for="pet in filteredPets"
+                        v-for="(pet, petIdx) in filteredPets"
                         :key="pet.id"
                         class="pet-row"
+                        :data-pet-id="pet.id"
                     >
+                        <td class="col-drag-handle">
+                            <span class="drag-handle" title="拖拽排序" style="cursor:grab;user-select:none">⠿</span>
+                        </td>
+                        <td class="col-row-num">{{ petIdx + 1 }}</td>
                         <td class="col-thumb">
                             <img :src="getFullUrl(pet.image_url)" :alt="pet.name" class="pet-thumb" />
                         </td>
@@ -499,25 +1064,58 @@ onMounted(async () => {
                             </div>
                         </td>
                         <td class="col-price">
-                            <span class="price-tag">{{ pet.price }}</span>
+                            <div class="price-cell">
+                                <input
+                                    v-if="editingPricePetId === pet.id"
+                                    v-model="editingPriceValue"
+                                    type="number"
+                                    min="0"
+                                    class="price-input"
+                                    @keydown="handlePriceKeydown(pet, $event)"
+                                    @blur="saveEditPrice(pet)"
+                                    ref="priceInput"
+                                />
+                                <span
+                                    v-else
+                                    class="price-tag editable"
+                                    @click="startEditPrice(pet)"
+                                >
+                                    {{ pet.price }}
+                                </span>
+                            </div>
                         </td>
                         <td class="col-status">
-                            <span class="status-tag" :class="pet.is_active ? 'status-active' : 'status-inactive'">
-                                {{ pet.is_active ? '已上架' : '已下架' }}
+                            <span class="status-tag" :class="pet.is_active ? 'status-active' : (pet.group === '草稿' && !pet.is_active ? 'status-draft' : 'status-inactive')">
+                                {{ pet.is_active ? '已上架' : (pet.group === '草稿' && !pet.is_active ? '草稿' : '已下架') }}
                             </span>
                         </td>
                         <td class="col-actions">
                             <div class="action-buttons">
-                                <button class="btn-action btn-edit" title="编辑" @click="openEditModal(pet)">
+                                <button v-if="pet.group === '草稿' && !pet.is_active && !showDraftOnly" class="btn-action btn-complete" title="完善信息后上架" @click="openEditModal(pet)">
+                                    ✍️
+                                </button>
+                                <button v-if="pet.group === '草稿' && !pet.is_active && showDraftOnly" class="btn-action btn-finish" title="完成精灵编辑" @click="completeDraft(pet)">
+                                    补
+                                </button>
+                                <button v-if="!(pet.group === '草稿' && !pet.is_active)" class="btn-action btn-edit" title="编辑" @click="openEditModal(pet)">
                                     ✏️
                                 </button>
                                 <button
+                                    v-if="!(pet.group === '草稿' && !pet.is_active)"
                                     class="btn-action"
                                     :class="pet.is_active ? 'btn-offline' : 'btn-online'"
                                     :title="pet.is_active ? '下架' : '上架'"
                                     @click="handleToggleActive(pet)"
                                 >
                                     {{ pet.is_active ? '📥' : '📤' }}
+                                </button>
+                                <button
+                                    v-if="!(pet.group === '草稿' && !pet.is_active) && !showDraftOnly"
+                                    class="btn-action btn-draft-move"
+                                    title="存草稿"
+                                    @click="moveToDraft(pet)"
+                                >
+                                    📋
                                 </button>
                                 <button class="btn-action btn-delete" title="删除" @click="confirmDelete(pet)">
                                     🗑️
@@ -530,7 +1128,7 @@ onMounted(async () => {
         </div>
 
         <!-- 添加/编辑弹窗 -->
-        <div v-if="showFormModal" class="modal-overlay" @click.self="closeFormModal">
+        <div v-if="showFormModal" class="modal-overlay">
             <div class="modal-card">
                 <div class="modal-header">
                     <h3 class="modal-title">{{ formTitle }}</h3>
@@ -667,6 +1265,14 @@ onMounted(async () => {
                 <div class="modal-footer">
                     <button class="btn-cancel" @click="closeFormModal">取消</button>
                     <button
+                        class="btn-draft"
+                        :disabled="formSubmitting || !formData.name.trim()"
+                        @click="handleSaveDraft"
+                    >
+                        <span v-if="formSubmitting" class="btn-spinner"></span>
+                        {{ formSubmitting ? '保存中...' : '存草稿' }}
+                    </button>
+                    <button
                         class="btn-save"
                         :disabled="formSubmitting || !formData.name.trim() || !formData.image_url.trim() || !effectiveGroup"
                         @click="handleFormSubmit"
@@ -679,7 +1285,7 @@ onMounted(async () => {
         </div>
 
         <!-- 删除确认弹窗 -->
-        <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="closeDeleteConfirm">
+        <div v-if="showDeleteConfirm" class="modal-overlay">
             <div class="modal-card modal-confirm">
                 <div class="modal-header modal-header-danger">
                     <h3 class="modal-title">确认删除</h3>
@@ -900,6 +1506,54 @@ onMounted(async () => {
     color: #1e293b;
 }
 
+.group-name-editable {
+    cursor: pointer;
+    border-bottom: 1px dashed transparent;
+    transition: all 0.2s ease;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.group-name-editable:hover {
+    border-bottom-color: #6366f1;
+    background: rgba(99, 102, 241, 0.06);
+}
+
+.group-rename-input {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+    border: 2px solid #6366f1;
+    border-radius: 6px;
+    padding: 4px 8px;
+    outline: none;
+    background: #fff;
+    width: 100%;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.btn-rename-group {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.btn-rename-group:hover {
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
+}
+
 .color-card-body {
     display: flex;
     align-items: center;
@@ -1080,6 +1734,77 @@ onMounted(async () => {
     transform: translateY(-2px) scale(0.97);
 }
 
+.btn-draft-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 2px solid #e2e8f0;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-draft-box:hover {
+    border-color: #f59e0b;
+    color: #d97706;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+}
+
+.btn-draft-box.active {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+}
+
+/* ======== 排序按钮 ======== */
+.btn-sort {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 2px solid #e2e8f0;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-sort:hover {
+    border-color: #6366f1;
+    color: #6366f1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+}
+
+.btn-sort:active {
+    transform: translateY(-2px) scale(0.97);
+}
+
+.btn-sort.active {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+}
+
+.sort-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .refresh-icon {
     font-size: 14px;
 }
@@ -1175,6 +1900,8 @@ onMounted(async () => {
     border-bottom: 2px solid rgba(99, 102, 241, 0.25);
 }
 
+.col-drag-handle { width: 36px; }
+.col-row-num { width: 40px; text-align: center; font-weight: 700; color: #94a3b8; font-size: 13px; }
 .col-thumb { width: 72px; }
 .col-name { min-width: 120px; }
 .col-group { min-width: 100px; }
@@ -1184,8 +1911,9 @@ onMounted(async () => {
 .col-actions { width: 140px; }
 
 .pet-table tbody tr {
-    transition: background 0.2s ease;
+    transition: background 0.2s ease, transform 0.2s cubic-bezier(0.2,0,0,1), opacity 0.2s;
     border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+    will-change: transform;
 }
 
 .pet-table tbody tr:last-child {
@@ -1199,6 +1927,30 @@ onMounted(async () => {
 .pet-table td {
     padding: 12px 16px;
     vertical-align: middle;
+}
+
+.pet-row {
+    transition: all 0.2s ease;
+    cursor: default;
+}
+
+.drag-handle {
+    display: inline-block;
+    cursor: grab;
+    font-size: 18px;
+    color: #94a3b8;
+    padding: 4px;
+    transition: color 0.2s;
+    user-select: none;
+    line-height: 1;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.pet-row:hover .drag-handle {
+    color: #6366f1;
 }
 
 .empty-row {
@@ -1278,6 +2030,53 @@ onMounted(async () => {
     color: #fff;
     background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
     box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
+    transition: all 0.25s ease;
+}
+
+.price-tag.editable {
+    cursor: pointer;
+}
+
+.price-tag.editable:hover {
+    transform: scale(1.08);
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+.price-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.price-input {
+    width: 70px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 2px solid #6366f1;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    background: #fff;
+    color: #1e293b;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    transition: all 0.2s ease;
+}
+
+.price-input:focus {
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
+}
+
+.price-input::-webkit-outer-spin-button,
+.price-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.price-input[type=number] {
+    -moz-appearance: textfield;
 }
 
 .status-tag {
@@ -1300,6 +2099,12 @@ onMounted(async () => {
     background: rgba(148, 163, 184, 0.12);
     color: #64748b;
     border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.status-draft {
+    background: rgba(245, 158, 11, 0.12);
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .action-buttons {
@@ -1347,6 +2152,35 @@ onMounted(async () => {
 .btn-delete:hover {
     background: rgba(239, 68, 68, 0.12);
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
+.btn-complete:hover {
+    background: rgba(245, 158, 11, 0.12);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+}
+
+.btn-finish {
+    width: auto !important;
+    padding: 4px 16px !important;
+    font-size: 14px;
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border-radius: 8px;
+    white-space: nowrap;
+    gap: 4px;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.btn-finish:hover {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+    box-shadow: 0 6px 18px rgba(245, 158, 11, 0.45) !important;
+    transform: translateY(-2px) scale(1.05) !important;
+}
+
+.btn-draft-move:hover {
+    background: rgba(245, 158, 11, 0.12) !important;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25) !important;
 }
 
 /* ======== 弹窗 ======== */
@@ -1801,6 +2635,38 @@ onMounted(async () => {
     cursor: not-allowed;
 }
 
+.btn-draft {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 28px;
+    border: 2px solid #f59e0b;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #d97706;
+    background: #fffbeb;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-draft:hover:not(:disabled) {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #fff;
+    border-color: transparent;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(245, 158, 11, 0.4);
+}
+
+.btn-draft:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+}
+
+.btn-draft:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .btn-danger {
     background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
     box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
@@ -1862,6 +2728,110 @@ onMounted(async () => {
     .modal-footer {
         padding: 12px 16px 16px;
     }
+}
+
+/* ======== 草稿箱模式样式 ======== */
+.pet-manage-page.draft-mode .page-header {
+    padding-bottom: 16px;
+    border-bottom: 2px solid rgba(245, 158, 11, 0.15);
+    margin-bottom: 20px;
+}
+
+.draft-mode .page-title {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+}
+
+.page-subtitle {
+    font-size: 14px;
+    color: #92400e;
+    margin: 4px 0 0 0;
+    font-weight: 500;
+    opacity: 0.7;
+}
+
+.btn-draft-add {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35) !important;
+}
+
+.btn-draft-add:hover {
+    box-shadow: 0 10px 28px rgba(245, 158, 11, 0.5) !important;
+}
+
+.draft-count-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 18px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.08) 100%);
+    border: 2px solid rgba(245, 158, 11, 0.25);
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #92400e;
+    white-space: nowrap;
+}
+
+.filter-bar-draft {
+    border-color: rgba(245, 158, 11, 0.2) !important;
+    background: linear-gradient(145deg, rgba(255, 251, 235, 0.98) 0%, rgba(254, 243, 199, 0.94) 100%) !important;
+}
+
+.btn-back-pets {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 2px solid #e2e8f0;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-back-pets:hover {
+    border-color: #6366f1;
+    color: #6366f1;
+    transform: translateX(-3px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+}
+
+.draft-mode .table-wrapper {
+    border-color: rgba(245, 158, 11, 0.2) !important;
+    background: linear-gradient(145deg, rgba(255, 251, 235, 0.98) 0%, rgba(254, 243, 199, 0.94) 100%) !important;
+}
+
+.draft-mode .pet-table thead {
+    background: linear-gradient(135deg, #78350f 0%, #92400e 50%, #78350f 100%) !important;
+    border-bottom-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+.draft-mode .pet-table th {
+    color: #fcd34d !important;
+}
+
+.draft-mode .pet-table tbody tr:hover {
+    background: rgba(245, 158, 11, 0.06) !important;
+}
+
+.draft-mode .drag-handle:hover,
+.draft-mode .pet-row:hover .drag-handle {
+    color: #d97706 !important;
+}
+
+.draft-mode .btn-sort.active {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4) !important;
+}
+
+.draft-mode .btn-sort:hover {
+    border-color: #f59e0b !important;
+    color: #d97706 !important;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15) !important;
 }
 
 /* Toast 提示 */

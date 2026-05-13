@@ -8,6 +8,7 @@ export interface Pet {
   description: string
   abilities: string[]
   is_active: boolean
+  sort_order: number
 }
 
 export interface FilterOptions {

@@ -10,18 +10,36 @@ interface MenuItem {
     name: string
     path: string
     icon: string
+    query?: Record<string, string>
 }
 
 const menuItems: MenuItem[] = [
     { name: '精灵管理', path: '/admin/pets', icon: '🐾' },
+    { name: '草稿箱', path: '/admin/pets', icon: '📋', query: { draft: '1' } },
     { name: '公告管理', path: '/admin/announcement', icon: '📢' },
     { name: '账号管理', path: '/admin/accounts', icon: '👤' }
 ]
 
 const activePath = computed(() => route.path)
+const activeQuery = computed(() => route.query)
 
-function navigateTo(path: string) {
-    router.push(path)
+function navigateTo(item: MenuItem) {
+    if (item.query) {
+        router.push({ path: item.path, query: item.query })
+    } else {
+        router.push(item.path)
+    }
+}
+
+function isActive(item: MenuItem): boolean {
+    if (item.path !== activePath.value) return false
+    if (item.query && item.query.draft) {
+        return activeQuery.value.draft === item.query.draft
+    }
+    if (!item.query) {
+        return !activeQuery.value.draft
+    }
+    return false
 }
 
 function goToFront() {
@@ -45,10 +63,10 @@ function handleLogout() {
             <nav class="sidebar-nav">
                 <button
                     v-for="item in menuItems"
-                    :key="item.path"
+                    :key="item.name"
                     class="nav-item"
-                    :class="{ active: activePath === item.path }"
-                    @click="navigateTo(item.path)"
+                    :class="{ active: isActive(item) }"
+                    @click="navigateTo(item)"
                 >
                     <span class="nav-icon">{{ item.icon }}</span>
                     <span class="nav-label">{{ item.name }}</span>

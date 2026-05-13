@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Optional, List
 
-from fastapi import FastAPI, HTTPException, Query, Body
+from fastapi import FastAPI, HTTPException, Query, Body, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -11,7 +11,7 @@ import os
 import json
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-DATABASE_URL = f"sqlite:///{os.path.join(current_dir, 'locke_pets.db')}"
+DATABASE_URL = f"sqlite:///{os.path.join(current_dir, 'system_data.db')}"
 
 connect_args = {}
 if DATABASE_URL.startswith("sqlite"):
@@ -63,6 +63,7 @@ class Pet(Base):
     description = Column(Text, default="")
     abilities = Column(Text, default="[]")
     is_active = Column(Boolean, default=True)
+    sort_order = Column(Integer, default=0)
     created_at = Column(DateTime, default=func.now())
 
 class Announcement(Base):
@@ -137,10 +138,11 @@ def get_pets(
                 "attributes": attrs,
                 "description": pet.description,
                 "abilities": json.loads(pet.abilities) if pet.abilities else [],
-                "is_active": pet.is_active
+                "is_active": pet.is_active,
+                "sort_order": pet.sort_order
             })
 
-    valid_sort_fields = ["id", "price", "name"]
+    valid_sort_fields = ["id", "price", "name", "sort_order"]
     if sort_by not in valid_sort_fields:
         sort_by = "price"
 
@@ -148,6 +150,8 @@ def get_pets(
         result.sort(key=lambda x: x[sort_by], reverse=True)
     else:
         result.sort(key=lambda x: x[sort_by])
+
+    result.sort(key=lambda x: x.get("sort_order", 0))
 
     db.close()
     return result
@@ -169,7 +173,8 @@ def get_pet(pet_id: int):
         "attributes": json.loads(pet.attributes),
         "description": pet.description,
         "abilities": json.loads(pet.abilities) if pet.abilities else [],
-        "is_active": pet.is_active
+        "is_active": pet.is_active,
+        "sort_order": pet.sort_order
     }
 
     db.close()
@@ -192,6 +197,7 @@ class PetCreate(BaseModel):
     attributes: list = []
     description: str = ""
     abilities: list = []
+    is_active: bool = True
 
 
 class PetUpdate(BaseModel):
@@ -220,7 +226,7 @@ def create_pet(body: PetCreate):
         attributes=json.dumps(body.attributes, ensure_ascii=False),
         description=body.description,
         abilities=json.dumps(body.abilities, ensure_ascii=False) if body.abilities else "[]",
-        is_active=True
+        is_active=body.is_active
     )
     db.add(pet)
     db.commit()
@@ -235,10 +241,34 @@ def create_pet(body: PetCreate):
         "description": pet.description,
         "abilities": json.loads(pet.abilities) if pet.abilities else [],
         "is_active": pet.is_active,
+        "sort_order": pet.sort_order,
         "created_at": str(pet.created_at) if pet.created_at else None
     }
     db.close()
     return result
+
+
+@app.put("/api/pets/sort-order")
+async def batch_update_sort_order(request: Request):
+    import json as _json
+    raw_bytes = await request.body()
+    data = _json.loads(raw_bytes)
+    items = data.get("items", [])
+    db = SessionLocal()
+    count = 0
+    for item in items:
+        try:
+            pet_id = int(item.get("id", 0))
+            sort_val = int(item.get("sort_order", 0))
+            pet = db.query(Pet).filter(Pet.id == pet_id).first()
+            if pet:
+                pet.sort_order = sort_val
+                count += 1
+        except (ValueError, TypeError, AttributeError):
+            continue
+    db.commit()
+    db.close()
+    return {"message": f"已更新 {count} 只精灵的排序", "count": count}
 
 
 @app.put("/api/pets/{pet_id}")
@@ -270,6 +300,7 @@ def update_pet(pet_id: int, body: PetUpdate):
         "description": pet.description,
         "abilities": json.loads(pet.abilities) if pet.abilities else [],
         "is_active": pet.is_active,
+        "sort_order": pet.sort_order,
         "created_at": str(pet.created_at) if pet.created_at else None
     }
     db.close()
@@ -311,6 +342,7 @@ def toggle_active(pet_id: int):
         "description": pet.description,
         "abilities": json.loads(pet.abilities) if pet.abilities else [],
         "is_active": pet.is_active,
+        "sort_order": pet.sort_order,
         "created_at": str(pet.created_at) if pet.created_at else None
     }
     db.close()
@@ -320,7 +352,7 @@ def toggle_active(pet_id: int):
 @app.patch("/api/pets/batch-activate")
 def batch_activate():
     db = SessionLocal()
-    count = db.query(Pet).filter(Pet.is_active == False).update({"is_active": True})
+    count = db.query(Pet).filter(Pet.is_active == False, (Pet.group != '草稿')).update({"is_active": True})
     db.commit()
     db.close()
     return {"message": f"已上架 {count} 只精灵", "count": count}
@@ -329,7 +361,7 @@ def batch_activate():
 @app.patch("/api/pets/batch-deactivate")
 def batch_deactivate():
     db = SessionLocal()
-    count = db.query(Pet).filter(Pet.is_active == True).update({"is_active": False})
+    count = db.query(Pet).filter(Pet.is_active == True, (Pet.group != '草稿')).update({"is_active": False})
     db.commit()
     db.close()
     return {"message": f"已下架 {count} 只精灵", "count": count}
@@ -411,6 +443,35 @@ def update_group_color(group_name: str, body: GroupColorUpdate):
     }
     db.close()
     return result
+
+
+class GroupRename(BaseModel):
+    new_name: str
+
+
+@app.put("/api/groups/{group_name}")
+def rename_group(group_name: str, body: GroupRename):
+    db = SessionLocal()
+    new_name = body.new_name.strip()
+    if not new_name:
+        db.close()
+        raise HTTPException(status_code=400, detail="新名称不能为空")
+    
+    updated = db.query(Pet).filter(Pet.group == group_name).update({"group": new_name})
+    
+    color_record = db.query(GroupColor).filter(GroupColor.group_name == group_name).first()
+    if color_record:
+        target_color = db.query(GroupColor).filter(GroupColor.group_name == new_name).first()
+        if target_color:
+            target_color.color = color_record.color
+            db.delete(color_record)
+        else:
+            color_record.group_name = new_name
+    
+    db.commit()
+    db.close()
+    return {"message": f"已将 {updated} 只精灵从 '{group_name}' 移至 '{new_name}'", "old_name": group_name, "new_name": new_name}
+
 
 
 @app.get("/api/admin/accounts")
@@ -515,7 +576,7 @@ def auto_migrate():
     """自动创建缺失的表和列"""
     import sqlite3
     
-    db_path = os.path.join(current_dir, 'locke_pets.db')
+    db_path = os.path.join(current_dir, 'system_data.db')
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
@@ -556,6 +617,10 @@ def auto_migrate():
         if 'is_active' not in existing_columns:
             cursor.execute("ALTER TABLE pets ADD COLUMN is_active BOOLEAN DEFAULT 1")
             print("[Migration] is_active column added to pets table")
+        
+        if 'sort_order' not in existing_columns:
+            cursor.execute("ALTER TABLE pets ADD COLUMN sort_order INTEGER DEFAULT 0")
+            print("[Migration] sort_order column added to pets table")
     
     if 'announcement' not in existing_tables:
         cursor.execute('''
