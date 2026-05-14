@@ -63,8 +63,67 @@ function handleSaveClick(e: MouseEvent) {
     handleSave()
 }
 
+// 作者信息 - 可编辑
+interface AuthorInfo {
+    author: string
+    project: string
+    version: string
+    tech: string
+    github: string
+    email: string
+    qq: string
+    petCount: string
+    attrCount: string
+    ballCount: string
+}
+
+const defaultInfo: AuthorInfo = {
+    author: 'pipibigking',
+    project: '洛克王国异色精灵图鉴',
+    version: 'v1.0.0',
+    tech: 'Vue3 + FastAPI',
+    github: 'https://github.com/pipibigking',
+    email: 'pipibigking@example.com',
+    qq: '123456789',
+    petCount: '21',
+    attrCount: '18',
+    ballCount: '14'
+}
+
+const authorInfo = ref<AuthorInfo>({ ...defaultInfo })
+const editingInfo = ref(false)
+
+function loadAuthorInfo() {
+    try {
+        const saved = localStorage.getItem('announcement_author_info')
+        if (saved) {
+            authorInfo.value = { ...defaultInfo, ...JSON.parse(saved) }
+        }
+    } catch {
+        authorInfo.value = { ...defaultInfo }
+    }
+}
+
+function saveAuthorInfo() {
+    try {
+        localStorage.setItem('announcement_author_info', JSON.stringify(authorInfo.value))
+        editingInfo.value = false
+        showSuccessToast('作者信息保存成功！')
+    } catch {
+        showSuccessToast('保存失败')
+    }
+}
+
+function resetAuthorInfo() {
+    authorInfo.value = { ...defaultInfo }
+    localStorage.removeItem('announcement_author_info')
+    editingInfo.value = false
+    showSuccessToast('已恢复默认信息')
+}
+
 onMounted(() => {
     loadAnnouncement()
+    loadAuthorInfo()
 })
 </script>
 
@@ -108,26 +167,30 @@ onMounted(() => {
                 <div class="info-panel">
                     <div class="info-card">
                         <div class="info-header">
-                            <span class="info-icon">🎨</span>
+                            <span class="info-icon">[A]</span>
                             <span>关于作者</span>
                         </div>
                         <div class="info-body">
                             <table class="info-table">
                                 <tr>
                                     <td class="info-label">作者</td>
-                                    <td class="info-value">pipibigking</td>
+                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.author }}</td>
+                                    <td v-else class="info-value"><input v-model="authorInfo.author" class="info-input" /></td>
                                 </tr>
                                 <tr>
                                     <td class="info-label">项目</td>
-                                    <td class="info-value">洛克王国异色精灵图鉴</td>
+                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.project }}</td>
+                                    <td v-else class="info-value"><input v-model="authorInfo.project" class="info-input" /></td>
                                 </tr>
                                 <tr>
                                     <td class="info-label">版本</td>
-                                    <td class="info-value">v1.0.0</td>
+                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.version }}</td>
+                                    <td v-else class="info-value"><input v-model="authorInfo.version" class="info-input" /></td>
                                 </tr>
                                 <tr>
                                     <td class="info-label">技术栈</td>
-                                    <td class="info-value">Vue3 + FastAPI</td>
+                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.tech }}</td>
+                                    <td v-else class="info-value"><input v-model="authorInfo.tech" class="info-input" /></td>
                                 </tr>
                             </table>
                         </div>
@@ -135,24 +198,27 @@ onMounted(() => {
 
                     <div class="info-card">
                         <div class="info-header">
-                            <span class="info-icon">📮</span>
+                            <span class="info-icon">[C]</span>
                             <span>联系方式</span>
                         </div>
                         <div class="info-body">
                             <table class="info-table">
                                 <tr>
                                     <td class="info-label">GitHub</td>
-                                    <td class="info-value">
-                                        <a href="https://github.com/pipibigking" target="_blank" class="info-link">@pipibigking</a>
+                                    <td v-if="!editingInfo" class="info-value">
+                                        <a :href="authorInfo.github" target="_blank" class="info-link">@{{ authorInfo.author }}</a>
                                     </td>
+                                    <td v-else class="info-value"><input v-model="authorInfo.github" class="info-input" /></td>
                                 </tr>
                                 <tr>
                                     <td class="info-label">邮箱</td>
-                                    <td class="info-value">pipibigking@example.com</td>
+                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.email }}</td>
+                                    <td v-else class="info-value"><input v-model="authorInfo.email" class="info-input" /></td>
                                 </tr>
                                 <tr>
                                     <td class="info-label">QQ群</td>
-                                    <td class="info-value">123456789</td>
+                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.qq }}</td>
+                                    <td v-else class="info-value"><input v-model="authorInfo.qq" class="info-input" /></td>
                                 </tr>
                             </table>
                         </div>
@@ -160,25 +226,37 @@ onMounted(() => {
 
                     <div class="info-card">
                         <div class="info-header">
-                            <span class="info-icon">📊</span>
+                            <span class="info-icon">[D]</span>
                             <span>数据统计</span>
                         </div>
                         <div class="info-body">
                             <table class="info-table">
                                 <tr>
                                     <td class="info-label">精灵数量</td>
-                                    <td class="info-value">21 种</td>
+                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.petCount }} 种</td>
+                                    <td v-else class="info-value"><input v-model="authorInfo.petCount" class="info-input" /></td>
                                 </tr>
                                 <tr>
                                     <td class="info-label">属性种类</td>
-                                    <td class="info-value">18 种</td>
+                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.attrCount }} 种</td>
+                                    <td v-else class="info-value"><input v-model="authorInfo.attrCount" class="info-input" /></td>
                                 </tr>
                                 <tr>
                                     <td class="info-label">捕捉球</td>
-                                    <td class="info-value">14 种</td>
+                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.ballCount }} 种</td>
+                                    <td v-else class="info-value"><input v-model="authorInfo.ballCount" class="info-input" /></td>
                                 </tr>
                             </table>
                         </div>
+                    </div>
+
+                    <div class="info-actions">
+                        <button v-if="!editingInfo" class="btn-edit" @click="editingInfo = true">编辑信息</button>
+                        <template v-else>
+                            <button class="btn-save-info" @click="saveAuthorInfo">保存</button>
+                            <button class="btn-reset" @click="resetAuthorInfo">恢复默认</button>
+                            <button class="btn-cancel" @click="editingInfo = false; loadAuthorInfo()">取消</button>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -219,7 +297,7 @@ onMounted(() => {
     left: 220px;
     right: 0;
     bottom: 0;
-    background: rgba(241, 245, 249, 0.75);
+    background: rgba(241, 245, 249, 0.5);
     z-index: -1;
 }
 
@@ -285,8 +363,8 @@ onMounted(() => {
     color: #475569;
     margin-bottom: 12px;
     padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(236, 72, 153, 0.3);
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(236, 72, 153, 0.25);
     border-radius: 8px;
     display: inline-block;
     width: fit-content;
@@ -297,15 +375,15 @@ onMounted(() => {
     flex: 1;
     min-height: 320px;
     padding: 20px;
-    border: 2px solid rgba(226, 232, 240, 0.6);
+    border: 2px solid rgba(226, 232, 240, 0.4);
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.55);
     font-size: 15px;
     font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
     line-height: 1.8;
     color: #1e293b;
     resize: vertical;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(6px);
     outline: none;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -330,8 +408,8 @@ onMounted(() => {
     font-size: 13px;
     color: #94a3b8;
     padding: 6px 14px;
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(226, 232, 240, 0.5);
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(226, 232, 240, 0.35);
     border-radius: 20px;
     backdrop-filter: blur(4px);
 }
@@ -402,18 +480,18 @@ onMounted(() => {
 }
 
 .info-card {
-    background: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.5);
     border-radius: 16px;
-    border: 2px solid rgba(236, 72, 153, 0.15);
+    border: 2px solid rgba(236, 72, 153, 0.12);
     overflow: hidden;
-    backdrop-filter: blur(8px);
-    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
     transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .info-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
 }
 
 .info-header {
@@ -421,12 +499,12 @@ onMounted(() => {
     align-items: center;
     gap: 10px;
     padding: 14px 20px;
-    background: linear-gradient(135deg, rgba(236, 72, 153, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%);
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.12) 0%, rgba(139, 92, 246, 0.08) 100%);
     color: #1e293b;
     font-size: 15px;
     font-weight: 600;
     letter-spacing: 0.5px;
-    border-bottom: 1px solid rgba(236, 72, 153, 0.1);
+    border-bottom: 1px solid rgba(236, 72, 153, 0.08);
 }
 
 .info-icon {
@@ -443,7 +521,7 @@ onMounted(() => {
 }
 
 .info-table tr {
-    border-bottom: 1px solid rgba(226, 232, 240, 0.4);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.3);
 }
 
 .info-table tr:last-child {
@@ -477,6 +555,97 @@ onMounted(() => {
 .info-link:hover {
     color: #db2777;
     text-decoration: underline;
+}
+
+.info-input {
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid rgba(236, 72, 153, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    color: #1e293b;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.info-input:focus {
+    border-color: #ec4899;
+    box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.1);
+}
+
+.info-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.btn-edit {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.btn-edit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+}
+
+.btn-save-info {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.btn-save-info:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-reset {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.btn-reset:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-cancel {
+    padding: 8px 20px;
+    border: 1px solid rgba(226, 232, 240, 0.5);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.5);
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.8);
+    color: #1e293b;
 }
 
 .toast-bar {
