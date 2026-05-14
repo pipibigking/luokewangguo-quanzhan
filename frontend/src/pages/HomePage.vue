@@ -995,7 +995,9 @@ body {
 }
 
 .header-title:hover {
-  filter: drop-shadow(0 0 40px rgba(255, 107, 157, 0.2)) drop-shadow(0 0 80px rgba(77, 150, 255, 0.15));
+  filter: drop-shadow(0 0 30px rgba(255, 107, 157, 0.35))
+          drop-shadow(0 0 60px rgba(255, 217, 61, 0.25))
+          drop-shadow(0 0 100px rgba(77, 150, 255, 0.2));
 }
 
 .header-title:hover .title-char::after {
@@ -1017,19 +1019,19 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   text-shadow: none;
-  filter: drop-shadow(0 0 8px rgba(255, 107, 157, 0.4))
-          drop-shadow(0 0 20px rgba(255, 217, 61, 0.25))
-          drop-shadow(0 0 40px rgba(77, 150, 255, 0.2));
+  filter: drop-shadow(0 0 12px rgba(255, 107, 157, 0.5))
+          drop-shadow(0 0 30px rgba(255, 217, 61, 0.35))
+          drop-shadow(0 0 60px rgba(77, 150, 255, 0.25));
 }
 
 .title-char:hover::before {
   opacity: 1;
-  background: linear-gradient(135deg,
-    rgba(255, 107, 157, 0.2) 0%,
-    rgba(255, 154, 118, 0.15) 25%,
-    rgba(255, 217, 61, 0.12) 50%,
-    rgba(77, 150, 255, 0.15) 75%,
-    rgba(155, 89, 182, 0.2) 100%);
+  background: radial-gradient(circle at center,
+    rgba(255, 107, 157, 0.25) 0%,
+    rgba(255, 154, 118, 0.18) 30%,
+    rgba(255, 217, 61, 0.12) 55%,
+    rgba(77, 150, 255, 0.15) 80%,
+    transparent 100%);
 }
 
 .header-subtitle {
