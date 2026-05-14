@@ -580,72 +580,114 @@ onMounted(() => {
     justify-content: center;
 }
 
-.btn-edit {
-    padding: 8px 20px;
+/* ======== 统一按钮风格（与粉色背景主题适配） ======== */
+.btn-edit,
+.btn-save-info,
+.btn-reset,
+.btn-cancel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 24px;
     border: none;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
-    color: #fff;
-    font-size: 13px;
+    border-radius: 50px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.25s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    letter-spacing: 0.5px;
+    min-width: 90px;
+}
+
+.btn-edit::before,
+.btn-save-info::before,
+.btn-reset::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.6s;
+}
+
+.btn-edit:hover::before,
+.btn-save-info:hover::before,
+.btn-reset:hover::before {
+    left: 100%;
+}
+
+/* 编辑信息 - 粉色渐变（与背景主题一致） */
+.btn-edit {
+    background: linear-gradient(135deg, #ec4899 0%, #f472b6 50%, #db2777 100%);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(236, 72, 153, 0.35);
 }
 
 .btn-edit:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 24px rgba(236, 72, 153, 0.45), 0 0 0 4px rgba(236, 72, 153, 0.1);
 }
 
+.btn-edit:active {
+    transform: translateY(-1px) scale(0.97);
+}
+
+/* 保存 - 青绿色渐变 */
 .btn-save-info {
-    padding: 8px 20px;
-    border: none;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: linear-gradient(135deg, #14b8a6 0%, #2dd4bf 50%, #0d9488 100%);
     color: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.25s ease;
+    box-shadow: 0 4px 16px rgba(20, 184, 166, 0.35);
 }
 
 .btn-save-info:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 24px rgba(20, 184, 166, 0.45), 0 0 0 4px rgba(20, 184, 166, 0.1);
 }
 
+.btn-save-info:active {
+    transform: translateY(-1px) scale(0.97);
+}
+
+/* 恢复默认 - 琥珀色渐变 */
 .btn-reset {
-    padding: 8px 20px;
-    border: none;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #d97706 100%);
     color: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.25s ease;
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
 }
 
 .btn-reset:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.45), 0 0 0 4px rgba(245, 158, 11, 0.1);
 }
 
+.btn-reset:active {
+    transform: translateY(-1px) scale(0.97);
+}
+
+/* 取消 - 毛玻璃风格 */
 .btn-cancel {
-    padding: 8px 20px;
-    border: 1px solid rgba(226, 232, 240, 0.5);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(236, 72, 153, 0.25);
     color: #64748b;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.25s ease;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
 .btn-cancel:hover {
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.45);
+    border-color: rgba(236, 72, 153, 0.4);
     color: #1e293b;
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+}
+
+.btn-cancel:active {
+    transform: translateY(-1px) scale(0.97);
 }
 
 .toast-bar {
