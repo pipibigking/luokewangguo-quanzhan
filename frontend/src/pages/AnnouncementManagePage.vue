@@ -105,19 +105,7 @@ onMounted(() => {
                     </div>
                 </div>
 
-                <div class="preview-panel">
-                    <div class="preview-card">
-                        <div class="preview-card-header">
-                            <span class="preview-dot"></span>
-                            <span>系统公告</span>
-                        </div>
-                        <div class="preview-card-body">
-                            <p v-if="content.trim()" class="preview-text">{{ content }}</p>
-                            <p v-else class="preview-placeholder">公告内容为空，前台将不显示公告栏</p>
-                        </div>
-                    </div>
-                    <p class="preview-hint">↑ 以上为前台用户看到的公告效果</p>
-                </div>
+
             </div>
         </template>
 
