@@ -157,8 +157,8 @@ onMounted(() => {
                             :disabled="saving"
                             @click="handleSaveClick"
                         >
-                            <span v-if="saving" class="save-icon">⏳</span>
-                            <span v-else class="save-icon">💾</span>
+                            <span v-if="saving" class="save-icon">[S]</span>
+                            <span v-else class="save-icon">[S]</span>
                             保存公告
                         </button>
                     </div>
@@ -417,20 +417,22 @@ onMounted(() => {
 .save-button {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 12px 32px;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 24px;
     border: none;
     border-radius: 50px;
-    background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+    background: linear-gradient(135deg, #ec4899 0%, #f472b6 50%, #db2777 100%);
     color: #ffffff;
-    font-size: 15px;
-    font-weight: 700;
+    font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 6px 20px rgba(6, 182, 212, 0.35), 0 0 0 0 rgba(6, 182, 212, 0.4);
+    box-shadow: 0 4px 16px rgba(236, 72, 153, 0.35);
     position: relative;
     overflow: hidden;
     letter-spacing: 0.5px;
+    min-width: 120px;
 }
 
 .save-button::before {
@@ -451,7 +453,7 @@ onMounted(() => {
 
 .save-button:hover:not(:disabled) {
     transform: translateY(-3px) scale(1.02);
-    box-shadow: 0 10px 28px rgba(6, 182, 212, 0.5), 0 0 0 4px rgba(6, 182, 212, 0.1);
+    box-shadow: 0 8px 24px rgba(236, 72, 153, 0.45), 0 0 0 4px rgba(236, 72, 153, 0.1);
 }
 
 .save-button:hover:not(:disabled)::before {
@@ -460,7 +462,6 @@ onMounted(() => {
 
 .save-button:active:not(:disabled) {
     transform: translateY(-1px) scale(0.97);
-    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
 }
 
 .save-button:disabled {
@@ -469,7 +470,9 @@ onMounted(() => {
 }
 
 .save-icon {
-    font-size: 18px;
+    font-size: 13px;
+    font-weight: 700;
+    opacity: 0.8;
 }
 
 /* ======== 右侧信息面板 ======== */
