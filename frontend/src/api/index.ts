@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Pet, Announcement } from '@/types'
+import type { Pet, Announcement, Message } from '@/types'
 
 const api = axios.create({
   baseURL: '/api',
@@ -142,6 +142,47 @@ export async function deleteAdminAccount(username: string): Promise<void> {
 export async function adminLogin(username: string, password: string): Promise<{ success: boolean; username: string; message: string }> {
   const response = await api.post('/admin/login', { username, password })
   return response.data
+}
+
+export async function getMessages(includeRead: boolean = true): Promise<Message[]> {
+  const response = await api.get('/messages', { params: { include_read: includeRead } })
+  return response.data
+}
+
+export async function getUnreadCount(): Promise<{ count: number }> {
+  const response = await api.get('/messages/unread-count')
+  return response.data
+}
+
+export async function createMessage(nickname: string, content: string): Promise<Message> {
+  const response = await api.post('/messages', { nickname, content })
+  return response.data
+}
+
+export async function markMessageRead(messageId: number): Promise<void> {
+  await api.put(`/messages/${messageId}/read`)
+}
+
+export async function markAllMessagesRead(): Promise<void> {
+  await api.put('/messages/read-all')
+}
+
+export async function deleteMessage(messageId: number): Promise<void> {
+  await api.delete(`/messages/${messageId}`)
+}
+
+export async function uploadImage(file: File): Promise<{ url: string; filename: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await fetch('/api/upload', {
+    method: 'POST',
+    body: formData
+  })
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({ detail: response.statusText }))
+    throw new Error(errData.detail || '上传失败')
+  }
+  return response.json()
 }
 
 export const IMAGE_BASE_URL = '/images'

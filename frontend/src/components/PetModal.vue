@@ -23,26 +23,7 @@ const currentIndex = computed(() => {
   return props.pets.findIndex(p => p.id === currentPet.value!.id)
 })
 
-const attributeConfig: Record<string, { desc: string }> = {
-  '普': { desc: '普通属性，没有特殊属性克制关系' },
-  '草': { desc: '草系属性，克制水系、地系和岩石系' },
-  '火': { desc: '火系属性，克制草系、冰系、虫系和机械系' },
-  '水': { desc: '水系属性，克制火系、地系和岩石系' },
-  '光': { desc: '光系属性，克制幽灵系和暗系' },
-  '地': { desc: '地系属性，克制火系、电系、毒系、岩石系和机械系' },
-  '冰': { desc: '冰系属性，克制草系、地系、翼系和龙系' },
-  '龙': { desc: '龙系属性，克制龙系' },
-  '电': { desc: '电系属性，克制水系和翼系' },
-  '毒': { desc: '毒系属性，克制草系和萌系' },
-  '虫': { desc: '虫系属性，克制草系、光系和恶系' },
-  '武': { desc: '武系属性，克制普通系、冰系、岩石系、恶系和机械系' },
-  '翼': { desc: '翼系属性，克制草系、武系和虫系' },
-  '萌': { desc: '萌系属性，克制龙系、武系和恶系' },
-  '幽': { desc: '幽系属性，克制光系和幽系' },
-  '恶': { desc: '恶系属性，克制光系和幽系' },
-  '机': { desc: '机械系属性，克制冰系和岩石系' },
-  '幻': { desc: '幻系属性，克制特殊属性' }
-}
+
 
 const handleClose = () => {
   emit('close')
@@ -118,7 +99,6 @@ watch(() => props.visible, (newVisible) => {
                       <img :src="getAttributeIconPath(attr)" :alt="attr" class="attribute-icon-small" />
                       <h5 class="attribute-name">{{ attr }}系属性</h5>
                     </div>
-                    <p class="attribute-text">{{ attributeConfig[attr]?.desc || '独特的属性能力' }}</p>
                   </div>
                 </div>
               </div>
@@ -472,14 +452,6 @@ watch(() => props.visible, (newVisible) => {
   font-weight: 800;
   color: #1e293b;
   margin: 0;
-}
-
-.attribute-text {
-  font-size: 11px;
-  color: #475569;
-  margin: 0;
-  line-height: 1.5;
-  padding-left: 26px;
 }
 
 /* 价格信息 */

@@ -836,7 +836,7 @@ onMounted(async () => {
 
         <div class="page-header">
             <h2 class="page-title">
-                {{ showDraftOnly ? '📋 草稿箱' : '✨ 精灵管理' }}
+                {{ showDraftOnly ? '草稿箱' : '精灵管理' }}
             </h2>
             <p v-if="showDraftOnly" class="page-subtitle">管理尚未完善的精灵草稿</p>
             <div class="header-actions" v-if="!showDraftOnly">
@@ -1318,6 +1318,37 @@ onMounted(async () => {
 .pet-manage-page {
     position: relative;
     z-index: 1;
+    min-height: 100%;
+}
+
+.pet-manage-page::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 220px;
+    right: 0;
+    bottom: 0;
+    background: url('/images/bg/阿布星星蓝色.png') center center / cover no-repeat;
+    z-index: -2;
+}
+
+.pet-manage-page::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 220px;
+    right: 0;
+    bottom: 0;
+    background: rgba(241, 245, 249, 0.5);
+    z-index: -1;
+}
+
+.pet-manage-page.draft-mode::before {
+    background: url('/images/bg/菊花梨五角星黄色.png') center center / cover no-repeat;
+}
+
+.pet-manage-page.draft-mode::after {
+    background: rgba(241, 245, 249, 0.5);
 }
 
 /* ======== 页面头部 ======== */
@@ -1439,22 +1470,24 @@ onMounted(async () => {
     align-items: center;
     gap: 16px;
     flex-wrap: wrap;
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.55) 0%, rgba(248, 250, 252, 0.5) 100%);
     border-radius: 16px;
     padding: 16px 20px;
     margin-bottom: 20px;
-    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.5);
     border: 2px solid rgba(99, 102, 241, 0.12);
+    backdrop-filter: blur(6px);
 }
 
 /* ======== 分组颜色管理器 ======== */
 .group-color-manager {
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.55) 0%, rgba(248, 250, 252, 0.5) 100%);
     border-radius: 16px;
     padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.5);
     border: 2px solid rgba(99, 102, 241, 0.12);
+    backdrop-filter: blur(6px);
 }
 
 .section-title-text {
@@ -1816,10 +1849,11 @@ onMounted(async () => {
     align-items: center;
     justify-content: center;
     padding: 80px 20px;
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.55) 0%, rgba(248, 250, 252, 0.5) 100%);
     border-radius: 20px;
-    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.5);
     border: 2px solid rgba(99, 102, 241, 0.12);
+    backdrop-filter: blur(6px);
 }
 
 .state-error {
@@ -1872,11 +1906,12 @@ onMounted(async () => {
 
 /* ======== 表格 ======== */
 .table-wrapper {
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.55) 0%, rgba(248, 250, 252, 0.5) 100%);
     border-radius: 20px;
-    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.5);
     border: 2px solid rgba(99, 102, 241, 0.12);
     overflow: hidden;
+    backdrop-filter: blur(6px);
 }
 
 .pet-table {

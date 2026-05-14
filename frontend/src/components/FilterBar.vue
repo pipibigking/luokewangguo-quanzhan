@@ -271,6 +271,10 @@ const getAttributeIconStyle = (attr: string) => {
   box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
 }
 
+.filter-button:active {
+  transform: translateY(-1px) scale(0.97);
+}
+
 .filter-button.active {
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: white;
@@ -313,6 +317,10 @@ const getAttributeIconStyle = (attr: string) => {
   color: #1a1a2e;
   transform: translateY(-3px);
   box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
+}
+
+.attribute-button:active {
+  transform: translateY(-1px) scale(0.97);
 }
 
 .attribute-button.active {
@@ -444,6 +452,10 @@ const getAttributeIconStyle = (attr: string) => {
   color: #1a1a2e;
   transform: translateY(-3px);
   box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
+}
+
+.sort-button:active {
+  transform: translateY(-1px) scale(0.97);
 }
 
 .sort-button.active {

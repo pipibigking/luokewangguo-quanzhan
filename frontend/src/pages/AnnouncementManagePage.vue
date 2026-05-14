@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { getAnnouncement, updateAnnouncement } from '@/api'
 import type { Announcement } from '@/types'
+import { createParticleBurst } from '@/utils/particleEffect'
 
 const content = ref('')
 const loading = ref(true)
@@ -57,6 +58,11 @@ async function handleSave() {
     }
 }
 
+function handleSaveClick(e: MouseEvent) {
+    createParticleBurst(e.currentTarget as HTMLElement, '#06b6d4')
+    handleSave()
+}
+
 onMounted(() => {
     loadAnnouncement()
 })
@@ -65,7 +71,7 @@ onMounted(() => {
 <template>
     <div class="announcement-page">
         <div class="page-header">
-            <h2 class="page-title">📢 公告管理</h2>
+            <h2 class="page-title">公告管理</h2>
             <p v-if="lastUpdated" class="page-meta">最后更新：{{ lastUpdated }}</p>
         </div>
 
@@ -90,7 +96,7 @@ onMounted(() => {
                             class="save-button"
                             :class="{ 'is-saving': saving }"
                             :disabled="saving"
-                            @click="handleSave"
+                            @click="handleSaveClick"
                         >
                             <span v-if="saving" class="save-icon">⏳</span>
                             <span v-else class="save-icon">💾</span>
@@ -100,7 +106,6 @@ onMounted(() => {
                 </div>
 
                 <div class="preview-panel">
-                    <label class="panel-label">前台预览效果</label>
                     <div class="preview-card">
                         <div class="preview-card-header">
                             <span class="preview-dot"></span>
@@ -129,6 +134,30 @@ onMounted(() => {
 .announcement-page {
     max-width: 1100px;
     margin: 0 auto;
+    position: relative;
+    min-height: 100%;
+}
+
+.announcement-page::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 220px;
+    right: 0;
+    bottom: 0;
+    background: url('/images/bg/独角兽音符粉色.png') center center / cover no-repeat;
+    z-index: -2;
+}
+
+.announcement-page::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 220px;
+    right: 0;
+    bottom: 0;
+    background: rgba(241, 245, 249, 0.75);
+    z-index: -1;
 }
 
 .page-header {
@@ -199,14 +228,15 @@ onMounted(() => {
     flex: 1;
     min-height: 320px;
     padding: 20px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid rgba(226, 232, 240, 0.6);
     border-radius: 12px;
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.75);
     font-size: 15px;
     font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
     line-height: 1.8;
     color: #1e293b;
     resize: vertical;
+    backdrop-filter: blur(8px);
     outline: none;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -238,26 +268,28 @@ onMounted(() => {
     gap: 8px;
     padding: 12px 32px;
     border: none;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    border-radius: 50px;
+    background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
     color: #ffffff;
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 6px 20px rgba(6, 182, 212, 0.35), 0 0 0 0 rgba(6, 182, 212, 0.4);
     position: relative;
     overflow: hidden;
+    letter-spacing: 0.5px;
 }
 
 .save-button::before {
     content: '';
     position: absolute;
-    inset: 0;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
-    opacity: 0;
-    transition: opacity 0.25s ease;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.6s;
 }
 
 .save-button span {
@@ -266,16 +298,17 @@ onMounted(() => {
 }
 
 .save-button:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 28px rgba(99, 102, 241, 0.45);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 10px 28px rgba(6, 182, 212, 0.5), 0 0 0 4px rgba(6, 182, 212, 0.1);
 }
 
 .save-button:hover:not(:disabled)::before {
-    opacity: 1;
+    left: 100%;
 }
 
 .save-button:active:not(:disabled) {
-    transform: translateY(0) scale(0.98);
+    transform: translateY(-1px) scale(0.97);
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
 }
 
 .save-button:disabled {

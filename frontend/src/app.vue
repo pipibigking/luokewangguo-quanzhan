@@ -1,8 +1,7 @@
-<script setup lang="ts">
-</script>
-
 <template>
-  <router-view />
+  <div class="app-shell">
+    <router-view />
+  </div>
 </template>
 
 <style>
@@ -14,8 +13,12 @@
 
 body {
   font-family: 'Noto Sans SC', 'Ma Shan Zheng', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  background: linear-gradient(180deg, #0a0f25 0%, #1e293b 50%, #0f172a 100%);
   min-height: 100vh;
   overflow-x: hidden;
+  background: linear-gradient(180deg, #0a0f25 0%, #1e293b 50%, #0f172a 100%);
+}
+
+.app-shell {
+  min-height: 100vh;
 }
 </style>

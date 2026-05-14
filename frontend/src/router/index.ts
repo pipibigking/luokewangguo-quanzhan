@@ -1,5 +1,12 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { isAuthenticated } from '@/utils/auth'
+import HomePage from '@/pages/HomePage.vue'
+import LoginPage from '@/pages/LoginPage.vue'
+import AdminLayout from '@/components/AdminLayout.vue'
+import PetManagePage from '@/pages/PetManagePage.vue'
+import AnnouncementManagePage from '@/pages/AnnouncementManagePage.vue'
+import AccountManagePage from '@/pages/AccountManagePage.vue'
+import MessageManagePage from '@/pages/MessageManagePage.vue'
 
 const router = createRouter({
     history: createWebHashHistory(),
@@ -7,32 +14,37 @@ const router = createRouter({
         {
             path: '/',
             name: 'home',
-            component: () => import('@/pages/HomePage.vue')
+            component: HomePage
         },
         {
             path: '/login',
             name: 'login',
-            component: () => import('@/pages/LoginPage.vue')
+            component: LoginPage
         },
         {
             path: '/admin',
-            component: () => import('@/components/AdminLayout.vue'),
+            component: AdminLayout,
             redirect: '/admin/pets',
             children: [
                 {
                     path: 'pets',
                     name: 'admin-pets',
-                    component: () => import('@/pages/PetManagePage.vue')
+                    component: PetManagePage
                 },
                 {
                     path: 'announcement',
                     name: 'admin-announcement',
-                    component: () => import('@/pages/AnnouncementManagePage.vue')
+                    component: AnnouncementManagePage
                 },
                 {
                     path: 'accounts',
                     name: 'admin-accounts',
-                    component: () => import('@/pages/AccountManagePage.vue')
+                    component: AccountManagePage
+                },
+                {
+                    path: 'messages',
+                    name: 'admin-messages',
+                    component: MessageManagePage
                 }
             ]
         }

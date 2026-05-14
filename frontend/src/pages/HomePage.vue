@@ -6,8 +6,10 @@ import type { Pet, FilterOptions } from '@/types'
 import { initGroupColors } from '@/utils/groupColors'
 import PetCard from '@/components/PetCard.vue'
 import PetModal from '@/components/PetModal.vue'
+import MessageModal from '@/components/MessageModal.vue'
 import FilterBar from '@/components/FilterBar.vue'
 import AnnouncementBar from '@/components/AnnouncementBar.vue'
+import HeaderParticles from '@/components/HeaderParticles.vue'
 
 const router = useRouter()
 
@@ -17,6 +19,7 @@ const loading = ref(true)
 const error = ref('')
 const selectedPet = ref<Pet | null>(null)
 const showModal = ref(false)
+const showMessageModal = ref(false)
 const canvasBgRef = ref<HTMLCanvasElement | null>(null)
 const canvasSnowRef = ref<HTMLCanvasElement | null>(null)
 const titleRef = ref<HTMLElement | null>(null)
@@ -639,7 +642,7 @@ onMounted(async () => {
   initializeTitleChars()
   initBgCanvas()
   initHeaderSnow()
-  await initGroupColors() // 初始化加载分组颜色
+  await initGroupColors()
   loadGroups()
   loadPets()
 })
@@ -657,8 +660,8 @@ onUnmounted(() => {
     
     <!-- 顶部标题 -->
     <header class="app-header">
-      <!-- Header 织梦棱镜球雪花画布 -->
-      <canvas ref="canvasSnowRef" class="snow-canvas"></canvas>
+      <!-- Header 粒子效果 -->
+      <HeaderParticles />
       <div class="header-content">
         <img ref="prismBallRef" class="title-icon" :src="titleIconSrc" alt="棱镜球" @click="onPrismBallClick" />
         <h1 ref="titleRef" class="header-title">
@@ -679,6 +682,9 @@ onUnmounted(() => {
 
     <!-- 主要内容 -->
     <main class="main-content">
+      <!-- 公告栏 - 移到筛选栏上方 -->
+      <AnnouncementBar />
+
       <!-- 筛选栏 -->
       <div class="filter-wrapper">
         <FilterBar
@@ -687,9 +693,6 @@ onUnmounted(() => {
           @update:filter-options="(options) => Object.assign(filterOptions, options)"
         />
       </div>
-
-      <!-- 公告栏 -->
-      <AnnouncementBar />
 
       <!-- 加载状态 -->
       <div v-if="loading" class="loading-container fade-in">
@@ -720,14 +723,23 @@ onUnmounted(() => {
           class="pet-card-item"
         />
       </transition-group>
+
+      <!-- 浮动按钮组 -->
     </main>
+
+    <!-- 浮动按钮组（放在根层级，避免被footer遮挡） -->
+    <div v-show="!showMessageModal" class="float-btn-group">
+      <button class="float-msg-btn" @click="showMessageModal = true" title="留言板">
+        <span class="float-msg-icon">💬</span>
+      </button>
+      <button class="admin-entry" @click="goToAdmin" title="管理后台">
+        <span class="admin-entry-icon">⚙️</span>
+      </button>
+    </div>
 
     <!-- 页脚 -->
     <footer class="app-footer">
       <p class="footer-text">洛克王国异色精灵展示平台</p>
-      <button class="admin-entry" @click="goToAdmin" title="管理后台">
-        <span class="admin-entry-icon">⚙️</span>
-      </button>
     </footer>
 
     <!-- 详情弹窗 -->
@@ -736,6 +748,12 @@ onUnmounted(() => {
       :pets="filteredPets"
       :visible="showModal"
       @close="closeModal"
+    />
+
+    <!-- 留言弹窗 -->
+    <MessageModal
+      :visible="showMessageModal"
+      @close="showMessageModal = false"
     />
   </div>
 </template>
@@ -784,26 +802,15 @@ body {
 
 /* Header 样式 */
 .app-header {
-  background: linear-gradient(135deg, 
-    #0a1628 0%, 
-    #0f2847 25%, 
-    #1e3a5f 50%, 
-    #0f2847 75%, 
-    #0a1628 100%);
-  padding: 55px 24px 65px 24px;
+  background: url('/images/bg/高举迪莫.jpg') center center / cover no-repeat;
+  padding: 60px 24px 70px 24px;
   text-align: center;
-  box-shadow: 0 25px 80px rgba(15, 23, 42, 0.7), 
-              0 -10px 40px rgba(96, 165, 250, 0.1) inset;
+  box-shadow: 
+    0 20px 60px rgba(15, 23, 42, 0.6), 
+    0 -10px 40px rgba(96, 165, 250, 0.08) inset;
   position: relative;
   overflow: hidden;
-  border-bottom: 4px solid transparent;
-  border-image: linear-gradient(90deg, 
-    transparent, 
-    #3b82f6, 
-    #60a5fa, 
-    #38bdf8, 
-    #3b82f6, 
-    transparent) 1;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.3);
 }
 
 .app-header::before {
@@ -813,52 +820,12 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: 
-    radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.12) 0%, transparent 50%),
-    radial-gradient(circle at 80% 30%, rgba(56, 189, 248, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 40% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
-  pointer-events: none;
-  animation: headerAura 8s ease-in-out infinite;
-}
-
-@keyframes headerAura {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
-.header-glow {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, 
-    rgba(96, 165, 250, 0.25) 0%, 
-    rgba(59, 130, 246, 0.18) 30%, 
-    rgba(56, 189, 248, 0.1) 50%,
-    transparent 70%);
-  animation: pulseGlow 5s ease-in-out infinite;
+  background: rgba(0, 0, 0, 0.4);
   z-index: 0;
 }
 
-@keyframes pulseGlow {
-  0%, 100% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.6;
-  }
-  25% {
-    transform: translate(-50%, -50%) scale(1.15);
-    opacity: 0.8;
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.1);
-    opacity: 0.7;
-  }
-  75% {
-    transform: translate(-50%, -50%) scale(1.2);
-    opacity: 0.9;
-  }
+.header-glow {
+  display: none;
 }
 
 .header-content {
@@ -909,8 +876,27 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  text-shadow: none;
   flex-wrap: wrap;
+  filter: drop-shadow(0 0 30px rgba(155, 89, 182, 0.12));
+}
+
+.header-title::before {
+  content: '';
+  position: absolute;
+  inset: -40px -60px;
+  border-radius: 60px;
+  background: radial-gradient(ellipse at center,
+    rgba(255, 107, 157, 0.06) 0%,
+    rgba(107, 203, 119, 0.04) 30%,
+    rgba(77, 150, 255, 0.06) 60%,
+    transparent 80%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.header-title:hover::before {
+  opacity: 1;
 }
 
 .title-char {
@@ -920,12 +906,11 @@ body {
   font-weight: 700;
   font-size: 68px;
   letter-spacing: 4px;
-  color: #1e293b;
-  text-shadow: 
-    2px 2px 0 #60a5fa,
-    4px 4px 0 #3b82f6,
-    6px 6px 0 rgba(59, 130, 246, 0.5),
-    0 0 30px rgba(96, 165, 250, 0.6);
+  color: #ffffff;
+  text-shadow:
+    0 0 12px rgba(255, 107, 157, 0.15),
+    0 0 24px rgba(255, 217, 61, 0.1),
+    0 0 36px rgba(77, 150, 255, 0.08);
   opacity: 0;
   transform: translateY(80px) scale(0.3) rotate(-15deg);
   animation: charRevealBounce 1.1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
@@ -933,54 +918,53 @@ body {
 }
 
 .title-char::before {
-  content: attr(data-char);
+  content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, 
-    rgba(96, 165, 250, 0.95) 0%, 
-    rgba(59, 130, 246, 0.8) 30%, 
-    rgba(37, 99, 235, 0.9) 60%, 
-    rgba(59, 130, 246, 0.8) 80%, 
-    rgba(96, 165, 250, 0.95) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  z-index: 1;
-  opacity: 1;
-  filter: drop-shadow(0 0 15px rgba(96, 165, 250, 0.9));
+  inset: -8px -12px;
+  border-radius: 30px;
+  background: radial-gradient(ellipse at center,
+    rgba(255, 107, 157, 0.12) 0%,
+    rgba(107, 203, 119, 0.08) 30%,
+    rgba(77, 150, 255, 0.1) 60%,
+    transparent 80%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: -1;
 }
 
 .title-char::after {
-  content: attr(data-char);
+  content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(180deg, 
-    rgba(255, 255, 255, 0.9) 0%, 
-    rgba(190, 220, 255, 0.5) 40%, 
-    transparent 70%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  z-index: 2;
-  opacity: 0.6;
-  pointer-events: none;
+  bottom: -4px;
+  left: 10%;
+  width: 80%;
+  height: 3px;
+  border-radius: 4px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 107, 157, 0.3) 25%,
+    rgba(255, 217, 61, 0.3) 50%,
+    rgba(77, 150, 255, 0.3) 75%,
+    transparent 100%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
 }
 
-.title-char:hover {
-  transform: scale(1.3) rotate(8deg) translateY(-8px);
-  text-shadow: 
-    2px 2px 0 #93c5fd,
-    4px 4px 0 #60a5fa,
-    6px 6px 0 #3b82f6,
-    8px 8px 0 rgba(37, 99, 235, 0.5),
-    0 0 40px rgba(96, 165, 250, 0.9),
-    0 0 80px rgba(59, 130, 246, 0.6);
+.title-char::selection,
+.header-title::selection {
+  color: transparent;
+  background: linear-gradient(135deg,
+    #ff6b9d 0%,
+    #ff9a76 16%,
+    #ffd93d 33%,
+    #6bcb77 50%,
+    #4d96ff 66%,
+    #9b59b6 83%,
+    #ff6b9d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: 0 0 10px rgba(155, 89, 182, 0.35);
 }
 
 @keyframes charRevealBounce {
@@ -1006,8 +990,12 @@ body {
 }
 
 .header-title:hover .title-char {
-  transform: translateY(-10px) scale(1.25) rotate(8deg);
+  transform: translateY(-12px) scale(1.28) rotate(6deg);
   letter-spacing: 12px;
+}
+
+.header-title:hover {
+  filter: drop-shadow(0 0 40px rgba(255, 107, 157, 0.2)) drop-shadow(0 0 80px rgba(77, 150, 255, 0.15));
 }
 
 .header-title:hover .title-char::after {
@@ -1016,35 +1004,42 @@ body {
 
 .title-char:hover {
   transform: translateY(-15px) scale(1.4) rotateY(15deg) rotate(5deg) !important;
-  background: linear-gradient(180deg, 
-    #ffffff 0%, 
-    #60a5fa 20%, 
-    #3b82f6 50%, 
-    #60a5fa 80%, 
-    #ffffff 100%);
+  background: linear-gradient(135deg,
+    #ff6b9d 0%,
+    #ff9a76 16%,
+    #ffd93d 33%,
+    #6bcb77 50%,
+    #4d96ff 66%,
+    #9b59b6 83%,
+    #ff6b9d 100%);
+  background-size: 200% 200%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  text-shadow: none;
+  filter: drop-shadow(0 0 8px rgba(255, 107, 157, 0.4))
+          drop-shadow(0 0 20px rgba(255, 217, 61, 0.25))
+          drop-shadow(0 0 40px rgba(77, 150, 255, 0.2));
 }
 
 .title-char:hover::before {
   opacity: 1;
-  background: linear-gradient(180deg, 
-    rgba(255, 255, 255, 1) 0%, 
-    rgba(96, 165, 250, 0.8) 50%, 
-    transparent 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  background: linear-gradient(135deg,
+    rgba(255, 107, 157, 0.2) 0%,
+    rgba(255, 154, 118, 0.15) 25%,
+    rgba(255, 217, 61, 0.12) 50%,
+    rgba(77, 150, 255, 0.15) 75%,
+    rgba(155, 89, 182, 0.2) 100%);
 }
 
 .header-subtitle {
   font-size: 22px;
-  color: rgba(255, 255, 255, 0.9);
+  color: #ffffff;
   font-weight: 600;
   letter-spacing: 4px;
-  opacity: 0.95;
+  opacity: 1;
   text-transform: uppercase;
+  text-shadow: none;
 }
 
 /* Main content */
@@ -1218,6 +1213,7 @@ body {
   border-top: 1px solid rgba(96, 165, 250, 0.2);
   position: relative;
   z-index: 1;
+  pointer-events: auto;
 }
 
 .footer-text {
@@ -1227,34 +1223,124 @@ body {
 }
 
 .admin-entry {
-  position: absolute;
-  right: 24px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  border: 2px solid rgba(96, 165, 250, 0.25);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.6);
+  border: 2px solid rgba(6, 182, 212, 0.4);
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  color: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   font-size: 18px;
+  box-shadow: 0 6px 20px rgba(6, 182, 212, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-entry::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s;
+}
+
+.admin-entry:hover::before {
+  left: 100%;
 }
 
 .admin-entry:hover {
-  background: rgba(99, 102, 241, 0.3);
-  border-color: rgba(139, 92, 246, 0.5);
+  background: linear-gradient(135deg, #0891b2 0%, #2563eb 100%);
+  border-color: rgba(56, 189, 248, 0.6);
   color: #fff;
-  transform: translateY(-50%) scale(1.1);
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+  transform: scale(1.1);
+  box-shadow: 0 8px 28px rgba(6, 182, 212, 0.5);
 }
 
 .admin-entry-icon {
   font-size: 18px;
   line-height: 1;
+}
+
+/* ======== 浮动按钮组 ======== */
+.float-btn-group {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  z-index: 9999;
+}
+
+/* ======== 浮动留言按钮 ======== */
+.float-msg-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid rgba(6, 182, 212, 0.4);
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  box-shadow: 0 8px 28px rgba(6, 182, 212, 0.45), 0 0 0 0 rgba(6, 182, 212, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: floatPulse 2.5s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+.float-msg-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s;
+}
+
+.float-msg-btn:hover::before {
+  left: 100%;
+}
+
+.float-msg-btn:hover {
+  transform: scale(1.12);
+  box-shadow: 0 12px 36px rgba(6, 182, 212, 0.6), 0 0 0 8px rgba(6, 182, 212, 0.12);
+  border-color: rgba(56, 189, 248, 0.6);
+}
+
+.float-msg-btn:active {
+  transform: scale(0.95);
+}
+
+.float-msg-icon {
+  font-size: 26px;
+  line-height: 1;
+  animation: iconBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes floatPulse {
+  0%, 100% {
+    box-shadow: 0 8px 28px rgba(6, 182, 212, 0.45), 0 0 0 0 rgba(6, 182, 212, 0.4);
+  }
+  50% {
+    box-shadow: 0 8px 28px rgba(6, 182, 212, 0.45), 0 0 0 12px rgba(6, 182, 212, 0);
+  }
+}
+
+@keyframes iconBounce {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.3); }
+  100% { transform: scale(1); }
 }
 </style>

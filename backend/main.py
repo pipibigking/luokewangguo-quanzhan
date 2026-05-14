@@ -1,6 +1,6 @@
 from typing import Optional, List
 
-from fastapi import FastAPI, HTTPException, Query, Body, Request
+from fastapi import FastAPI, HTTPException, Query, Body, Request, UploadFile, File
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -45,6 +45,10 @@ if os.path.exists(images_dir):
 else:
     print(f"警告: 图片目录不存在: {images_dir}")
 
+uploads_dir = os.path.join(project_dir, "images", "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/images/uploads", StaticFiles(directory=uploads_dir), name="images_uploads")
+
 if os.path.exists(icons_dir):
     app.mount("/icons", StaticFiles(directory=icons_dir), name="icons")
     print(f"属性图标目录已挂载: {icons_dir}")
@@ -86,6 +90,15 @@ class AdminAccount(Base):
     password = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+class Message(Base):
+    __tablename__ = "messages"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nickname = Column(String(50), nullable=False)
+    content = Column(Text, nullable=False)
+    ip_address = Column(String(50), default="")
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.now())
 
 def get_db():
     db = SessionLocal()
@@ -572,6 +585,133 @@ def admin_login(body: LoginRequest):
         raise HTTPException(status_code=401, detail="账号或密码错误")
 
 
+class MessageCreate(BaseModel):
+    nickname: str
+    content: str
+
+
+@app.get("/api/messages")
+def get_messages(include_read: bool = Query(True, description="是否包含已读留言")):
+    db = SessionLocal()
+    query = db.query(Message).order_by(Message.created_at.desc())
+    if not include_read:
+        query = query.filter(Message.is_read == False)
+    messages = query.all()
+    result = [
+        {
+            "id": m.id,
+            "nickname": m.nickname,
+            "content": m.content,
+            "is_read": m.is_read,
+            "created_at": str(m.created_at) if m.created_at else ""
+        }
+        for m in messages
+    ]
+    db.close()
+    return result
+
+
+@app.get("/api/messages/unread-count")
+def get_unread_count():
+    db = SessionLocal()
+    count = db.query(Message).filter(Message.is_read == False).count()
+    db.close()
+    return {"count": count}
+
+
+@app.post("/api/messages")
+def create_message(body: MessageCreate, request: Request):
+    if not body.nickname.strip() or not body.content.strip():
+        raise HTTPException(status_code=400, detail="昵称和内容不能为空")
+    
+    db = SessionLocal()
+    client_ip = request.client.host if request.client else "unknown"
+    
+    from datetime import datetime, timedelta
+    one_minute_ago = datetime.utcnow() - timedelta(minutes=1)
+    recent = db.query(Message).filter(
+        Message.ip_address == client_ip,
+        Message.created_at >= one_minute_ago
+    ).first()
+    
+    if recent:
+        db.close()
+        raise HTTPException(status_code=429, detail="留言过于频繁，请1分钟后再试")
+    
+    message = Message(
+        nickname=body.nickname.strip(),
+        content=body.content.strip(),
+        ip_address=client_ip,
+        is_read=False
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+    
+    result = {
+        "id": message.id,
+        "nickname": message.nickname,
+        "content": message.content,
+        "is_read": message.is_read,
+        "created_at": str(message.created_at) if message.created_at else ""
+    }
+    db.close()
+    return result
+
+
+@app.put("/api/messages/{message_id}/read")
+def mark_message_read(message_id: int):
+    db = SessionLocal()
+    message = db.query(Message).filter(Message.id == message_id).first()
+    if not message:
+        db.close()
+        raise HTTPException(status_code=404, detail="留言不存在")
+    message.is_read = True
+    db.commit()
+    db.close()
+    return {"message": "已标记为已读"}
+
+
+@app.put("/api/messages/read-all")
+def mark_all_read():
+    db = SessionLocal()
+    db.query(Message).filter(Message.is_read == False).update({"is_read": True})
+    db.commit()
+    db.close()
+    return {"message": "全部标记为已读"}
+
+
+@app.delete("/api/messages/{message_id}")
+def delete_message(message_id: int):
+    db = SessionLocal()
+    message = db.query(Message).filter(Message.id == message_id).first()
+    if not message:
+        db.close()
+        raise HTTPException(status_code=404, detail="留言不存在")
+    db.delete(message)
+    db.commit()
+    db.close()
+    return {"message": "删除成功"}
+
+
+@app.post("/api/upload")
+async def upload_pet_image(file: UploadFile = File(...)):
+    import uuid
+    import shutil
+    
+    ext = os.path.splitext(file.filename or "image.png")[1] or ".png"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    
+    uploads_dir = os.path.join(os.path.dirname(current_dir), "images", "uploads")
+    os.makedirs(uploads_dir, exist_ok=True)
+    
+    file_path = os.path.join(uploads_dir, filename)
+    with open(file_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    
+    return {"url": f"/images/uploads/{filename}", "filename": filename}
+
+
 def auto_migrate():
     """自动创建缺失的表和列"""
     import sqlite3
@@ -635,6 +775,19 @@ def auto_migrate():
             ('欢迎来到笑笑屁屁-洛克王国异色精灵交易平台！新精灵即将上架，敬请期待~',)
         )
         print("[Migration] announcement table created")
+    
+    if 'messages' not in existing_tables:
+        cursor.execute('''
+            CREATE TABLE messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nickname VARCHAR(50) NOT NULL,
+                content TEXT NOT NULL,
+                ip_address VARCHAR(50) DEFAULT '',
+                is_read BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        print("[Migration] messages table created")
     
     conn.commit()
     conn.close()

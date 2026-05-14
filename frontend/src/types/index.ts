@@ -24,3 +24,11 @@ export interface Announcement {
   content: string
   updated_at: string
 }
+
+export interface Message {
+  id: number
+  nickname: string
+  content: string
+  is_read: boolean
+  created_at: string
+}

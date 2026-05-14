@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getAccounts, addAccount, updateAccount, deleteAccount, getCurrentAdmin, type AdminAccount } from '@/utils/auth'
+import { createParticleBurst } from '@/utils/particleEffect'
 
 const accounts = ref<AdminAccount[]>([])
 const showAddModal = ref(false)
@@ -14,6 +15,8 @@ const newAccount = ref({ username: '', password: '' })
 const editingAccount = ref<AdminAccount | null>(null)
 const editingPassword = ref('')
 const deletingUsername = ref('')
+const showAddPwd = ref(false)
+const showEditPwd = ref(false)
 
 function showToast(msg: string, type: 'success' | 'error' = 'success') {
     toastMsg.value = msg
@@ -31,8 +34,14 @@ function openAddModal() {
     showAddModal.value = true
 }
 
+function handleAddAccountClick(e: MouseEvent) {
+    createParticleBurst(e.currentTarget as HTMLElement, '#06b6d4')
+    openAddModal()
+}
+
 function closeAddModal() {
     showAddModal.value = false
+    showAddPwd.value = false
 }
 
 async function handleAdd() {
@@ -68,6 +77,7 @@ function openEditModal(account: AdminAccount) {
 function closeEditModal() {
     showEditModal.value = false
     editingAccount.value = null
+    showEditPwd.value = false
 }
 
 async function handleUpdate() {
@@ -138,8 +148,8 @@ onMounted(() => {
         <div v-if="toastMsg" class="toast" :class="toastType">{{ toastMsg }}</div>
 
         <div class="page-header">
-            <h2 class="page-title">👤 账号管理</h2>
-            <button class="btn-add" @click="openAddModal">
+            <h2 class="page-title">账号管理</h2>
+            <button class="btn-add" @click="handleAddAccountClick">
                 <span class="btn-add-icon">+</span>
                 添加账号
             </button>
@@ -205,14 +215,20 @@ onMounted(() => {
                         />
                     </div>
                     <div class="form-group">
-                        <label class="form-label">登录密码</label>
-                        <input
-                            v-model="newAccount.password"
-                            type="password"
-                            placeholder="请输入登录密码（至少4位）"
-                            class="form-input"
-                        />
-                    </div>
+                            <label class="form-label">登录密码</label>
+                            <div class="pwd-input-wrap">
+                                <input
+                                    v-model="newAccount.password"
+                                    :type="showAddPwd ? 'text' : 'password'"
+                                    placeholder="请输入登录密码（至少4位）"
+                                    class="form-input"
+                                />
+                                <button type="button" class="pwd-toggle" @click="showAddPwd = !showAddPwd" :title="showAddPwd ? '隐藏密码' : '显示密码'">
+                                    <svg v-if="showAddPwd" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                    <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                            </div>
+                        </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn-cancel" @click="closeAddModal">取消</button>
@@ -231,14 +247,20 @@ onMounted(() => {
                 <div class="modal-body">
                     <p class="edit-hint">正在修改账号：<strong>{{ editingAccount.username }}</strong></p>
                     <div class="form-group">
-                        <label class="form-label">新密码</label>
-                        <input
-                            v-model="editingPassword"
-                            type="password"
-                            placeholder="请输入新密码（至少4位）"
-                            class="form-input"
-                        />
-                    </div>
+                            <label class="form-label">新密码</label>
+                            <div class="pwd-input-wrap">
+                                <input
+                                    v-model="editingPassword"
+                                    :type="showEditPwd ? 'text' : 'password'"
+                                    placeholder="请输入新密码（至少4位）"
+                                    class="form-input"
+                                />
+                                <button type="button" class="pwd-toggle" @click="showEditPwd = !showEditPwd" :title="showEditPwd ? '隐藏密码' : '显示密码'">
+                                    <svg v-if="showEditPwd" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                    <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                            </div>
+                        </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn-cancel" @click="closeEditModal">取消</button>
@@ -274,6 +296,29 @@ onMounted(() => {
 .account-manage-page {
     position: relative;
     z-index: 1;
+    min-height: 100%;
+}
+
+.account-manage-page::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 220px;
+    right: 0;
+    bottom: 0;
+    background: url('/images/bg/小狮鹫蓝色云朵.png') center center / cover no-repeat;
+    z-index: -2;
+}
+
+.account-manage-page::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 220px;
+    right: 0;
+    bottom: 0;
+    background: rgba(241, 245, 249, 0.75);
+    z-index: -1;
 }
 
 .page-header {
@@ -297,19 +342,42 @@ onMounted(() => {
     gap: 8px;
     padding: 12px 28px;
     border: none;
-    border-radius: 12px;
+    border-radius: 50px;
     font-size: 15px;
     font-weight: 700;
     color: #fff;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 6px 20px rgba(6, 182, 212, 0.35), 0 0 0 0 rgba(6, 182, 212, 0.4);
+    position: relative;
+    overflow: hidden;
+    letter-spacing: 0.5px;
+}
+
+.btn-add::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.6s;
 }
 
 .btn-add:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 28px rgba(99, 102, 241, 0.5);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 10px 28px rgba(6, 182, 212, 0.5), 0 0 0 4px rgba(6, 182, 212, 0.1);
+}
+
+.btn-add:hover::before {
+    left: 100%;
+}
+
+.btn-add:active {
+    transform: translateY(-1px) scale(0.97);
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
 }
 
 .btn-add-icon {
@@ -318,11 +386,12 @@ onMounted(() => {
 }
 
 .accounts-table-wrapper {
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.75) 0%, rgba(248, 250, 252, 0.7) 100%);
     border-radius: 20px;
-    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.7);
     border: 2px solid rgba(99, 102, 241, 0.12);
     overflow: hidden;
+    backdrop-filter: blur(8px);
 }
 
 .accounts-table {
@@ -455,7 +524,7 @@ onMounted(() => {
 }
 
 .modal-card {
-    background: #fff;
+    background: rgba(255, 255, 255, 0.9);
     border-radius: 20px;
     width: 100%;
     max-width: 480px;
@@ -463,6 +532,7 @@ onMounted(() => {
     animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
     position: relative;
     border: 2px solid rgba(99, 102, 241, 0.15);
+    backdrop-filter: blur(12px);
 }
 
 @keyframes modalIn {
@@ -602,12 +672,12 @@ onMounted(() => {
 
 .btn-cancel {
     padding: 10px 24px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid rgba(226, 232, 240, 0.6);
     border-radius: 10px;
     font-size: 14px;
     font-weight: 700;
     color: #475569;
-    background: #fff;
+    background: rgba(255, 255, 255, 0.75);
     cursor: pointer;
     transition: all 0.2s ease;
 }
@@ -678,5 +748,37 @@ onMounted(() => {
         opacity: 1;
         transform: translateX(-50%) translateY(0) scale(1);
     }
+}
+
+.pwd-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.pwd-input-wrap .form-input {
+    padding-right: 44px;
+}
+
+.pwd-toggle {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+    border-radius: 4px;
+}
+
+.pwd-toggle:hover {
+    color: #6366f1;
+    background: rgba(99, 102, 241, 0.08);
 }
 </style>
