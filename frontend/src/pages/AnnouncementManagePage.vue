@@ -105,7 +105,82 @@ onMounted(() => {
                     </div>
                 </div>
 
+                <div class="info-panel">
+                    <div class="info-card">
+                        <div class="info-header">
+                            <span class="info-icon">🎨</span>
+                            <span>关于作者</span>
+                        </div>
+                        <div class="info-body">
+                            <table class="info-table">
+                                <tr>
+                                    <td class="info-label">作者</td>
+                                    <td class="info-value">pipibigking</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">项目</td>
+                                    <td class="info-value">洛克王国异色精灵图鉴</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">版本</td>
+                                    <td class="info-value">v1.0.0</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">技术栈</td>
+                                    <td class="info-value">Vue3 + FastAPI</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
 
+                    <div class="info-card">
+                        <div class="info-header">
+                            <span class="info-icon">📮</span>
+                            <span>联系方式</span>
+                        </div>
+                        <div class="info-body">
+                            <table class="info-table">
+                                <tr>
+                                    <td class="info-label">GitHub</td>
+                                    <td class="info-value">
+                                        <a href="https://github.com/pipibigking" target="_blank" class="info-link">@pipibigking</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">邮箱</td>
+                                    <td class="info-value">pipibigking@example.com</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">QQ群</td>
+                                    <td class="info-value">123456789</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-header">
+                            <span class="info-icon">📊</span>
+                            <span>数据统计</span>
+                        </div>
+                        <div class="info-body">
+                            <table class="info-table">
+                                <tr>
+                                    <td class="info-label">精灵数量</td>
+                                    <td class="info-value">21 种</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">属性种类</td>
+                                    <td class="info-value">18 种</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">捕捉球</td>
+                                    <td class="info-value">14 种</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </template>
 
@@ -199,8 +274,7 @@ onMounted(() => {
     gap: 24px;
 }
 
-.editor-panel,
-.preview-panel {
+.editor-panel {
     display: flex;
     flex-direction: column;
 }
@@ -210,6 +284,13 @@ onMounted(() => {
     font-weight: 600;
     color: #475569;
     margin-bottom: 12px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(236, 72, 153, 0.3);
+    border-radius: 8px;
+    display: inline-block;
+    width: fit-content;
+    backdrop-filter: blur(4px);
 }
 
 .editor-textarea {
@@ -248,6 +329,11 @@ onMounted(() => {
 .char-count {
     font-size: 13px;
     color: #94a3b8;
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(226, 232, 240, 0.5);
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
 }
 
 .save-button {
@@ -308,75 +394,89 @@ onMounted(() => {
     font-size: 18px;
 }
 
-.preview-panel {
-    gap: 4px;
-}
-
-.preview-card {
-    flex: 1;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.5), 0 0 0 1px rgba(99, 102, 241, 0.2);
+/* ======== 右侧信息面板 ======== */
+.info-panel {
     display: flex;
     flex-direction: column;
+    gap: 16px;
 }
 
-.preview-card-header {
+.info-card {
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 16px;
+    border: 2px solid rgba(236, 72, 153, 0.15);
+    overflow: hidden;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.info-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.info-header {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 16px 24px;
-    background: linear-gradient(135deg, #0f2847 0%, #1e3a5f 50%, #0f2847 100%);
-    color: #e2e8f0;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%);
+    color: #1e293b;
     font-size: 15px;
     font-weight: 600;
-    letter-spacing: 1px;
-    border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(236, 72, 153, 0.1);
 }
 
-.preview-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #60a5fa;
-    box-shadow: 0 0 12px rgba(96, 165, 250, 0.7);
-    animation: dotPulse 2s ease-in-out infinite;
+.info-icon {
+    font-size: 18px;
 }
 
-@keyframes dotPulse {
-    0%, 100% { box-shadow: 0 0 8px rgba(96, 165, 250, 0.5); }
-    50% { box-shadow: 0 0 20px rgba(96, 165, 250, 0.9); }
+.info-body {
+    padding: 16px 20px;
 }
 
-.preview-card-body {
-    flex: 1;
-    padding: 24px;
-    background: linear-gradient(180deg, #0a0f25 0%, #1e293b 50%, #0f172a 100%);
-    min-height: 260px;
+.info-table {
+    width: 100%;
+    border-collapse: collapse;
 }
 
-.preview-text {
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 15px;
-    line-height: 2;
-    white-space: pre-wrap;
-    word-break: break-word;
-    text-shadow: 0 0 20px rgba(147, 197, 253, 0.3);
+.info-table tr {
+    border-bottom: 1px solid rgba(226, 232, 240, 0.4);
 }
 
-.preview-placeholder {
-    color: rgba(255, 255, 255, 0.3);
+.info-table tr:last-child {
+    border-bottom: none;
+}
+
+.info-table td {
+    padding: 10px 0;
     font-size: 14px;
-    font-style: italic;
-    text-align: center;
-    padding-top: 40px;
 }
 
-.preview-hint {
-    font-size: 12px;
-    color: #94a3b8;
-    text-align: center;
-    margin-top: 12px;
+.info-label {
+    color: #64748b;
+    font-weight: 500;
+    width: 80px;
+    white-space: nowrap;
+}
+
+.info-value {
+    color: #1e293b;
+    font-weight: 600;
+    text-align: right;
+}
+
+.info-link {
+    color: #ec4899;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.info-link:hover {
+    color: #db2777;
+    text-decoration: underline;
 }
 
 .toast-bar {
@@ -424,10 +524,6 @@ onMounted(() => {
 @media (max-width: 768px) {
     .editor-layout {
         grid-template-columns: 1fr;
-    }
-
-    .preview-card-body {
-        min-height: 200px;
     }
 
     .toast-bar {

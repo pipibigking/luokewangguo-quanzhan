@@ -146,7 +146,7 @@ function goToFront() {
             <div class="visual-overlay"></div>
             <div class="visual-gradient"></div>
             <div class="visual-content">
-                <h2 class="visual-title">探索异色精灵的世界</h2>
+                <h2 class="visual-title">和我一起探索洛克王国世界的精灵叭！</h2>
                 <p class="visual-description">记录每一只独特的精灵，守护洛克王国的珍贵记忆</p>
             </div>
         </div>
