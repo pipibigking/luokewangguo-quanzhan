@@ -40,16 +40,27 @@ function initParticles() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const resizeCanvas = () => {
-        const parent = canvas.parentElement
-        if (parent) {
-            canvas.width = parent.offsetWidth
-            canvas.height = parent.offsetHeight
-        }
+    let dpr = 1
+
+    const syncCanvasSize = () => {
+        if (!canvas) return
+        dpr = window.devicePixelRatio || 1
+        const rect = canvas.getBoundingClientRect()
+        const w = Math.round(rect.width)
+        const h = Math.round(rect.height)
+        if (w === 0 || h === 0) return
+        canvas.width = w * dpr
+        canvas.height = h * dpr
     }
 
-    resizeCanvas()
-    window.addEventListener('resize', resizeCanvas)
+    const getRect = () => {
+        if (!canvas) return { w: 0, h: 0 }
+        const rect = canvas.getBoundingClientRect()
+        return { w: Math.round(rect.width), h: Math.round(rect.height) }
+    }
+
+    syncCanvasSize()
+    window.addEventListener('resize', syncCanvasSize)
 
     const loadedImages: HTMLImageElement[] = []
     let imagesLoaded = 0
@@ -75,19 +86,20 @@ function initParticles() {
     })
 
     function startAnimation() {
+        const size = getRect()
         const particles: Particle[] = []
         const particleCount = 50
 
         for (let i = 0; i < particleCount; i++) {
             const angle = Math.random() * Math.PI * 2
             const radius = Math.random() * 0.3 + 0.1
-            
+
             particles.push({
-                x: Math.random() * (canvas?.width || 0),
-                y: Math.random() * (canvas?.height || 0),
+                x: Math.random() * size.w,
+                y: Math.random() * size.h,
                 vx: 0,
                 vy: 0,
-                size: Math.random() * 35 + 15,
+                size: 36,
                 baseAngle: angle,
                 orbitRadius: radius,
                 orbitSpeed: (Math.random() * 0.002 + 0.001) * (Math.random() > 0.5 ? 1 : -1),
@@ -103,11 +115,11 @@ function initParticles() {
         const handleMouseMove = (e: MouseEvent) => {
             const rect = canvas?.getBoundingClientRect()
             if (!rect) return
-            
+
             const x = e.clientX - rect.left
             const y = e.clientY - rect.top
-            
-            if (x >= 0 && x <= (canvas?.width || 0) && y >= 0 && y <= (canvas?.height || 0)) {
+
+            if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
                 mouseX = x
                 mouseY = y
                 isMouseOverCanvas = true
@@ -125,7 +137,10 @@ function initParticles() {
 
         function animate() {
             if (!ctx || !canvas) return
-            ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+            const size = getRect()
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+            ctx.clearRect(0, 0, size.w, size.h)
 
             for (const p of particles) {
                 p.baseAngle += p.orbitSpeed
@@ -156,18 +171,18 @@ function initParticles() {
                 p.y += p.vy
 
                 if (p.x < -p.size) {
-                    p.x = canvas.width + p.size
+                    p.x = size.w + p.size
                     p.baseAngle = Math.random() * Math.PI * 2
                 }
-                if (p.x > canvas.width + p.size) {
+                if (p.x > size.w + p.size) {
                     p.x = -p.size
                     p.baseAngle = Math.random() * Math.PI * 2
                 }
                 if (p.y < -p.size) {
-                    p.y = canvas.height + p.size
+                    p.y = size.h + p.size
                     p.baseAngle = Math.random() * Math.PI * 2
                 }
-                if (p.y > canvas.height + p.size) {
+                if (p.y > size.h + p.size) {
                     p.y = -p.size
                     p.baseAngle = Math.random() * Math.PI * 2
                 }
@@ -182,9 +197,13 @@ function initParticles() {
                     ctx.rotate(p.baseAngle * 0.1)
 
                     const drawSize = p.size
+                    const srcSize = Math.min(img.naturalWidth, img.naturalHeight)
+                    const sx = (img.naturalWidth - srcSize) / 2
+                    const sy = (img.naturalHeight - srcSize) / 2
 
                     ctx.drawImage(
                         img,
+                        sx, sy, srcSize, srcSize,
                         -drawSize / 2,
                         -drawSize / 2,
                         drawSize,
@@ -200,7 +219,7 @@ function initParticles() {
         animate()
 
         return () => {
-            window.removeEventListener('resize', resizeCanvas)
+            window.removeEventListener('resize', syncCanvasSize)
             window.removeEventListener('mousemove', handleMouseMove)
             canvas?.removeEventListener('mouseleave', handleMouseLeave)
             cancelAnimationFrame(animationId)

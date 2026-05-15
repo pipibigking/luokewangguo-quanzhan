@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { FilterOptions } from '@/types'
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { getAttributeIconPath } from '@/utils/attributeIcons'
 
 const ATTRIBUTES = ['普', '草', '火', '水', '光', '地', '冰', '龙', '电', '毒', '虫', '武', '翼', '萌', '幽', '恶', '机', '幻']
@@ -79,30 +79,6 @@ const setSortPriceDesc = () => {
     sortOrder: 'desc'
   })
   setTimeout(() => { isUpdating.value = false }, 200)
-}
-
-const getAttributeIconStyle = (attr: string) => {
-  const colors: Record<string, { bg: string; border: string }> = {
-    '普': { bg: 'linear-gradient(135deg, #E5E7EB 0%, #9CA3AF 100%)', border: '#6B7280' },
-    '草': { bg: 'linear-gradient(135deg, #A7F3D0 0%, #34D399 100%)', border: '#059669' },
-    '火': { bg: 'linear-gradient(135deg, #FECACA 0%, #F87171 100%)', border: '#DC2626' },
-    '水': { bg: 'linear-gradient(135deg, #BFDBFE 0%, #60A5FA 100%)', border: '#2563EB' },
-    '光': { bg: 'linear-gradient(135deg, #FEF3C7 0%, #FCD34D 100%)', border: '#D97706' },
-    '地': { bg: 'linear-gradient(135deg, #FDE68A 0%, #F59E0B 100%)', border: '#B45309' },
-    '冰': { bg: 'linear-gradient(135deg, #CFFAFE 0%, #67E8F9 100%)', border: '#0891B2' },
-    '龙': { bg: 'linear-gradient(135deg, #DDD6FE 0%, #8B5CF6 100%)', border: '#6D28D9' },
-    '电': { bg: 'linear-gradient(135deg, #FEF9C3 0%, #FDE047 100%)', border: '#CA8A04' },
-    '毒': { bg: 'linear-gradient(135deg, #F5D0FE 0%, #D946EF 100%)', border: '#A21CAF' },
-    '虫': { bg: 'linear-gradient(135deg, #D9F99D 0%, #A3E635 100%)', border: '#65A30D' },
-    '武': { bg: 'linear-gradient(135deg, #FECACA 0%, #EF4444 100%)', border: '#B91C1C' },
-    '翼': { bg: 'linear-gradient(135deg, #DBEAFE 0%, #818CF8 100%)', border: '#4F46E5' },
-    '萌': { bg: 'linear-gradient(135deg, #FCE7F3 0%, #F9A8D4 100%)', border: '#DB2777' },
-    '幽': { bg: 'linear-gradient(135deg, #EDE9FE 0%, #C4B5FD 100%)', border: '#7C3AED' },
-    '恶': { bg: 'linear-gradient(135deg, #E5E7EB 0%, #9CA3AF 100%)', border: '#4B5563' },
-    '机': { bg: 'linear-gradient(135deg, #E5E7EB 0%, #9CA3AF 100%)', border: '#6B7280' },
-    '幻': { bg: 'linear-gradient(135deg, #FCE7F3 0%, #FBCFE8 100%)', border: '#EC4899' }
-  }
-  return colors[attr] || colors['普']
 }
 </script>
 

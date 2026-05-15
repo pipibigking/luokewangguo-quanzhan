@@ -25,6 +25,11 @@ app = FastAPI(title="洛克王国精灵展示 API", version="1.0")
 
 @app.get("/")
 def root():
+    frontend_dist_path = os.path.join(project_dir, "frontend", "dist")
+    index_path = os.path.join(frontend_dist_path, "index.html")
+    if os.path.exists(index_path):
+        from fastapi.responses import FileResponse
+        return FileResponse(index_path, media_type="text/html")
     return {"message": "洛克王国异色精灵展示 API", "docs": "/docs", "api": "/api/pets"}
 
 app.add_middleware(
@@ -808,11 +813,28 @@ def init_default_data():
     db.close()
 
 
+# ──── 部署：提供前端构建产物 ────
+frontend_dist = os.path.join(project_dir, "frontend", "dist")
+if os.path.exists(frontend_dist):
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
+    print(f"[Deploy] 前端静态文件已加载: {frontend_dist}")
+    print(f"[Deploy] 访问 http://localhost:8004/ 打开前端页面")
+else:
+    print(f"[Deploy] 警告: 前端构建目录不存在: {frontend_dist}")
+    print(f"[Deploy] 请先在 frontend 目录执行: npm run build")
+
+
 if __name__ == "__main__":
     import uvicorn
     
     auto_migrate()
     
     init_default_data()
+    
+    print(f"\n{'='*50}")
+    print(f"  洛克王国异色精灵展示系统")
+    print(f"  API 文档: http://localhost:8004/docs")
+    print(f"  前端页面: http://localhost:8004/")
+    print(f"{'='*50}\n")
     
     uvicorn.run(app, host="0.0.0.0", port=8004)

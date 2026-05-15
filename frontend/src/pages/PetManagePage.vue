@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getPets, getGroups, createPet, updatePet, deletePet, togglePetActive, batchActivatePets, batchDeactivatePets, renameGroup, batchUpdateSortOrder } from '@/api'
+import { getPets, getGroups, createPet, updatePet, deletePet, togglePetActive, batchActivatePets, batchDeactivatePets, renameGroup } from '@/api'
 import type { Pet } from '@/types'
-import { getGroupColor as getGroupColorUtil, loadGroupColors, saveGroupColor, initGroupColors } from '@/utils/groupColors'
+import { getGroupColor as getGroupColorUtil, saveGroupColor, initGroupColors } from '@/utils/groupColors'
 import { getAttributeIconPath } from '@/utils/attributeIcons'
 
 const route = useRoute()

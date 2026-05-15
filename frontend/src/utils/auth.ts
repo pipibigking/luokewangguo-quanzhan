@@ -3,8 +3,7 @@ import {
     getAdminAccounts as apiGetAdminAccounts,
     createAdminAccount as apiCreateAdminAccount,
     updateAdminAccount as apiUpdateAdminAccount,
-    deleteAdminAccount as apiDeleteAdminAccount,
-    type AdminAccount as ApiAdminAccount
+    deleteAdminAccount as apiDeleteAdminAccount
 } from '@/api'
 
 const AUTH_KEY = 'admin_authenticated'

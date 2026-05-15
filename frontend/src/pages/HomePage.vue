@@ -22,7 +22,6 @@ const showModal = ref(false)
 const showMessageModal = ref(false)
 const canvasBgRef = ref<HTMLCanvasElement | null>(null)
 const canvasSnowRef = ref<HTMLCanvasElement | null>(null)
-const titleRef = ref<HTMLElement | null>(null)
 const titleIconSrc = '/images/balls/棱镜球.png'
 const prismBallRef = ref<HTMLElement | null>(null)
 
@@ -302,6 +301,7 @@ interface NetParticle {
 let bgAnimId = 0
 let bgCtx: CanvasRenderingContext2D | null = null
 let bgW = 0; let bgH = 0
+let bgDpr = 1
 let netParticles: NetParticle[] = []
 let mouseX = -999; let mouseY = -999
 
@@ -309,10 +309,13 @@ function initBgCanvas() {
   const canvas = canvasBgRef.value
   if (!canvas) return
   bgCtx = canvas.getContext('2d')
+  bgDpr = window.devicePixelRatio || 1
   bgW = window.innerWidth
   bgH = window.innerHeight
-  canvas.width = bgW
-  canvas.height = bgH
+  canvas.width = bgW * bgDpr
+  canvas.height = bgH * bgDpr
+  canvas.style.width = bgW + 'px'
+  canvas.style.height = bgH + 'px'
   const count = Math.floor((bgW * bgH) / 15000)
   netParticles = Array.from({ length: count }, () => ({
     x: Math.random() * bgW,
@@ -329,10 +332,13 @@ function initBgCanvas() {
 function resizeBg() {
   const canvas = canvasBgRef.value
   if (!canvas) return
+  bgDpr = window.devicePixelRatio || 1
   bgW = window.innerWidth
   bgH = window.innerHeight
-  canvas.width = bgW
-  canvas.height = bgH
+  canvas.width = bgW * bgDpr
+  canvas.height = bgH * bgDpr
+  canvas.style.width = bgW + 'px'
+  canvas.style.height = bgH + 'px'
 }
 
 function onMouseMove(e: MouseEvent) {
@@ -343,6 +349,7 @@ function onMouseMove(e: MouseEvent) {
 function animateBg() {
   if (!bgCtx) return
   const ctx = bgCtx
+  ctx.setTransform(bgDpr, 0, 0, bgDpr, 0, 0)
   ctx.clearRect(0, 0, bgW, bgH)
 
   for (const p of netParticles) {
@@ -405,6 +412,7 @@ interface HeaderSnow {
 let snowAnimId = 0
 let snowCtx: CanvasRenderingContext2D | null = null
 let snowW = 0; let snowH = 0
+let snowDpr = 1
 let headerSnows: HeaderSnow[] = []
 const snowImgs: (HTMLImageElement | null)[] = [null, null, null]
 const snowImgPaths = [
@@ -449,10 +457,11 @@ function startHeaderSnow() {
 function resizeHeaderSnow() {
   const canvas = canvasSnowRef.value
   if (!canvas || !headerEl) return
+  snowDpr = window.devicePixelRatio || 1
   snowW = headerEl.offsetWidth
   snowH = headerEl.offsetHeight
-  canvas.width = snowW
-  canvas.height = snowH
+  canvas.width = snowW * snowDpr
+  canvas.height = snowH * snowDpr
   canvas.style.width = snowW + 'px'
   canvas.style.height = snowH + 'px'
 }
@@ -480,6 +489,7 @@ function createHeaderSnows() {
 function animateHeaderSnow() {
   if (!snowCtx) return
   const ctx = snowCtx
+  ctx.setTransform(snowDpr, 0, 0, snowDpr, 0, 0)
   ctx.clearRect(0, 0, snowW, snowH)
 
   for (const s of headerSnows) {
@@ -499,7 +509,10 @@ function animateHeaderSnow() {
 
     const img = snowImgs[s.imgIndex]
     if (img && img.complete && img.naturalWidth > 0) {
-      ctx.drawImage(img, -s.size / 2, -s.size / 2, s.size, s.size)
+      const srcSize = Math.min(img.naturalWidth, img.naturalHeight)
+      const sx = (img.naturalWidth - srcSize) / 2
+      const sy = (img.naturalHeight - srcSize) / 2
+      ctx.drawImage(img, sx, sy, srcSize, srcSize, -s.size / 2, -s.size / 2, s.size, s.size)
     } else {
       ctx.beginPath()
       const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, s.size * 0.6)
@@ -664,7 +677,7 @@ onUnmounted(() => {
       <HeaderParticles />
       <div class="header-content">
         <img ref="prismBallRef" class="title-icon" :src="titleIconSrc" alt="棱镜球" @click="onPrismBallClick" />
-        <h1 ref="titleRef" class="header-title">
+        <h1 class="header-title">
           <span 
             v-for="(item, index) in titleChars" 
             :key="index" 
