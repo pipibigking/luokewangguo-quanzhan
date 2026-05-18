@@ -124,7 +124,8 @@ function runCooldownTick(endTime: number) {
 
 function fmtTime(dateStr: string): string {
     if (!dateStr) return ''
-    const d = new Date(dateStr)
+    const d = new Date(dateStr.includes('Z') || dateStr.includes('+') ? dateStr : dateStr + 'Z')
+    if (isNaN(d.getTime())) return dateStr
     const pad = (n: number) => n.toString().padStart(2, '0')
     return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }

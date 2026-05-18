@@ -29,8 +29,8 @@ echo.
 :: 第二步：构建前端
 echo [2/4] 构建前端项目...
 cd frontend
-call npm install --silent
-call npm run build
+call npm install --legacy-peer-deps --silent
+call npx vite build
 cd ..
 echo 完成
 echo.

@@ -72,22 +72,18 @@ interface AuthorInfo {
     github: string
     email: string
     qq: string
-    petCount: string
-    attrCount: string
-    ballCount: string
+    phone: string
 }
 
 const defaultInfo: AuthorInfo = {
     author: 'pipibigking',
     project: '洛克王国异色精灵图鉴',
     version: 'v1.0.0',
-    tech: 'Vue3 + FastAPI',
+    tech: '前端：Vue 3 + TypeScript + Tailwind CSS + Vite\n后端：Python + FastAPI + SQLite\n部署：阿里云 ECS（CentOS 7.9）',
     github: 'https://github.com/pipibigking',
-    email: 'pipibigking@example.com',
-    qq: '123456789',
-    petCount: '21',
-    attrCount: '18',
-    ballCount: '14'
+    email: '2807380340@qq.com',
+    qq: '196303221',
+    phone: '你的电话号码'
 }
 
 const authorInfo = ref<AuthorInfo>({ ...defaultInfo })
@@ -189,8 +185,8 @@ onMounted(() => {
                                 </tr>
                                 <tr>
                                     <td class="info-label">技术栈</td>
-                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.tech }}</td>
-                                    <td v-else class="info-value"><input v-model="authorInfo.tech" class="info-input" /></td>
+                                    <td v-if="!editingInfo" class="info-value tech-stack">{{ authorInfo.tech }}</td>
+                                    <td v-else class="info-value"><textarea v-model="authorInfo.tech" class="info-input tech-input" rows="4"></textarea></td>
                                 </tr>
                             </table>
                         </div>
@@ -220,31 +216,10 @@ onMounted(() => {
                                     <td v-if="!editingInfo" class="info-value">{{ authorInfo.qq }}</td>
                                     <td v-else class="info-value"><input v-model="authorInfo.qq" class="info-input" /></td>
                                 </tr>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div class="info-card">
-                        <div class="info-header">
-                            <span class="info-icon">[D]</span>
-                            <span>数据统计</span>
-                        </div>
-                        <div class="info-body">
-                            <table class="info-table">
                                 <tr>
-                                    <td class="info-label">精灵数量</td>
-                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.petCount }} 种</td>
-                                    <td v-else class="info-value"><input v-model="authorInfo.petCount" class="info-input" /></td>
-                                </tr>
-                                <tr>
-                                    <td class="info-label">属性种类</td>
-                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.attrCount }} 种</td>
-                                    <td v-else class="info-value"><input v-model="authorInfo.attrCount" class="info-input" /></td>
-                                </tr>
-                                <tr>
-                                    <td class="info-label">捕捉球</td>
-                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.ballCount }} 种</td>
-                                    <td v-else class="info-value"><input v-model="authorInfo.ballCount" class="info-input" /></td>
+                                    <td class="info-label">电话</td>
+                                    <td v-if="!editingInfo" class="info-value">{{ authorInfo.phone }}</td>
+                                    <td v-else class="info-value"><input v-model="authorInfo.phone" class="info-input" /></td>
                                 </tr>
                             </table>
                         </div>
@@ -575,6 +550,18 @@ onMounted(() => {
 .info-input:focus {
     border-color: #ec4899;
     box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.1);
+}
+
+.tech-stack {
+    white-space: pre-line;
+    line-height: 1.8;
+    font-size: 13px;
+}
+
+.tech-input {
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
 }
 
 .info-actions {
