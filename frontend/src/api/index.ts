@@ -6,6 +6,14 @@ const api = axios.create({
   timeout: 10000
 })
 
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('admin_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
 export async function getPets(
   group?: string,
   search?: string,
@@ -139,7 +147,7 @@ export async function deleteAdminAccount(username: string): Promise<void> {
   await api.delete(`/admin/accounts/${encodeURIComponent(username)}`)
 }
 
-export async function adminLogin(username: string, password: string): Promise<{ success: boolean; username: string; message: string }> {
+export async function adminLogin(username: string, password: string): Promise<{ success: boolean; token?: string; username: string; message: string }> {
   const response = await api.post('/admin/login', { username, password })
   return response.data
 }
@@ -154,8 +162,8 @@ export async function getUnreadCount(): Promise<{ count: number }> {
   return response.data
 }
 
-export async function createMessage(nickname: string, content: string): Promise<Message> {
-  const response = await api.post('/messages', { nickname, content })
+export async function createMessage(nickname: string, content: string, avatar_index: number = 0): Promise<Message> {
+  const response = await api.post('/messages', { nickname, content, avatar_index })
   return response.data
 }
 
@@ -183,6 +191,51 @@ export async function uploadImage(file: File): Promise<{ url: string; filename: 
     throw new Error(errData.detail || '上传失败')
   }
   return response.json()
+}
+
+export interface AvatarItem {
+  id: number
+  name: string
+  url: string
+}
+
+export interface MessageAvatars {
+  builtin: AvatarItem[]
+  custom: AvatarItem[]
+}
+
+export async function getMessageAvatars(): Promise<MessageAvatars> {
+  const response = await fetch('/api/message-avatars')
+  return response.json()
+}
+
+export async function uploadMessageAvatar(file: File, name?: string): Promise<AvatarItem> {
+  const formData = new FormData()
+  formData.append('file', file)
+  if (name) formData.append('name', name)
+  const response = await fetch('/api/message-avatars/upload', {
+    method: 'POST',
+    body: formData
+  })
+  if (!response.ok) throw new Error('上传失败')
+  return response.json()
+}
+
+export async function deleteMessageAvatar(avatarId: number): Promise<void> {
+  await fetch(`/api/message-avatars/${avatarId}`, { method: 'DELETE' })
+}
+
+export async function getSiteConfig(): Promise<Record<string, string>> {
+  const response = await fetch('/api/site-config')
+  return response.json()
+}
+
+export async function updateSiteConfig(config: Record<string, string>): Promise<void> {
+  await fetch('/api/site-config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config)
+  })
 }
 
 export const IMAGE_BASE_URL = '/images'

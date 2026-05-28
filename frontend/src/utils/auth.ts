@@ -1,12 +1,12 @@
-import { 
-    adminLogin as apiAdminLogin, 
+import {
+    adminLogin as apiAdminLogin,
     getAdminAccounts as apiGetAdminAccounts,
     createAdminAccount as apiCreateAdminAccount,
     updateAdminAccount as apiUpdateAdminAccount,
     deleteAdminAccount as apiDeleteAdminAccount
 } from '@/api'
 
-const AUTH_KEY = 'admin_authenticated'
+const TOKEN_KEY = 'admin_token'
 const CURRENT_ADMIN_KEY = 'current_admin'
 
 export interface AdminAccount {
@@ -62,14 +62,19 @@ export async function deleteAccount(username: string): Promise<boolean> {
 }
 
 export function isAuthenticated(): boolean {
-    return localStorage.getItem(AUTH_KEY) === 'true'
+    const token = localStorage.getItem(TOKEN_KEY)
+    return token !== null && token !== ''
+}
+
+export function getToken(): string | null {
+    return localStorage.getItem(TOKEN_KEY)
 }
 
 export async function login(username: string, password: string): Promise<boolean> {
     try {
         const result = await apiAdminLogin(username, password)
-        if (result.success) {
-            localStorage.setItem(AUTH_KEY, 'true')
+        if (result.success && result.token) {
+            localStorage.setItem(TOKEN_KEY, result.token)
             localStorage.setItem(CURRENT_ADMIN_KEY, username)
             return true
         }
@@ -81,10 +86,27 @@ export async function login(username: string, password: string): Promise<boolean
 }
 
 export function logout(): void {
-    localStorage.removeItem(AUTH_KEY)
+    localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(CURRENT_ADMIN_KEY)
 }
 
 export function getCurrentAdmin(): string | null {
     return localStorage.getItem(CURRENT_ADMIN_KEY)
+}
+
+export async function verifyToken(): Promise<boolean> {
+    try {
+        const response = await fetch('/api/admin/verify', {
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            }
+        })
+        if (response.ok) {
+            const data = await response.json()
+            return data.valid === true
+        }
+        return false
+    } catch {
+        return false
+    }
 }

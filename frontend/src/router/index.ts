@@ -1,5 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import { isAuthenticated } from '@/utils/auth'
+import { isAuthenticated, verifyToken, logout } from '@/utils/auth'
 import HomePage from '@/pages/HomePage.vue'
 import LoginPage from '@/pages/LoginPage.vue'
 import AdminLayout from '@/components/AdminLayout.vue'
@@ -51,9 +51,14 @@ const router = createRouter({
     ]
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
     if (to.path.startsWith('/admin')) {
         if (!isAuthenticated()) {
+            return { name: 'login' }
+        }
+        const valid = await verifyToken()
+        if (!valid) {
+            logout()
             return { name: 'login' }
         }
     }

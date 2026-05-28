@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getPets, getGroups, createPet, updatePet, deletePet, togglePetActive, batchActivatePets, batchDeactivatePets, renameGroup } from '@/api'
+import { getPets, getGroups, createPet, updatePet, deletePet, togglePetActive, batchActivatePets, batchDeactivatePets, renameGroup, batchUpdateSortOrder, uploadImage } from '@/api'
 import type { Pet } from '@/types'
 import { getGroupColor as getGroupColorUtil, saveGroupColor, initGroupColors } from '@/utils/groupColors'
 import { getAttributeIconPath } from '@/utils/attributeIcons'
@@ -77,6 +77,10 @@ const batchSubmitting = ref(false)
 // 内联编辑价格相关
 const editingPricePetId = ref<number | null>(null)
 const editingPriceValue = ref('')
+
+// 图片上传相关
+const uploading = ref(false)
+const uploadProgress = ref('')
 
 // ═════════════════════════════════════════════════
 //  拖拽排序 — 参照 animejs Draggable + Spring 物理
@@ -316,22 +320,10 @@ function resetDragState() {
 }
 
 async function saveSortOrder(newPets: Pet[]) {
-    const body = '{"items":[' + newPets.map((p, i) => '{"id":' + p.id + ',"sort_order":' + i + '}').join(',') + ']}'
-
+    const items = newPets.map((p, i) => ({ id: p.id, sort_order: i }))
     try {
-        const res = await fetch('http://localhost:8004/api/pets/sort-order', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body
-        })
-        if (res.ok) {
-            showToast('排序已保存', 'success')
-        } else {
-            const errText = await res.text()
-            console.error('[拖拽] 422响应体:', errText)
-            console.error('[拖拽] 请求体前200字:', body.slice(0, 200))
-            throw new Error('status ' + res.status + ': ' + errText)
-        }
+        await batchUpdateSortOrder(items)
+        showToast('排序已保存', 'success')
     } catch (err) {
         console.error('[拖拽] 保存失败:', err)
         showToast('排序保存失败', 'error')
@@ -508,6 +500,44 @@ function completeDraft(pet: Pet) {
 
 function closeFormModal() {
     showFormModal.value = false
+}
+
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+
+async function handleFileSelect(e: Event) {
+    const input = e.target as HTMLInputElement
+    const file = input.files?.[0]
+    if (!file) return
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        showToast('仅支持 JPG、PNG、GIF、WebP 格式', 'error')
+        input.value = ''
+        return
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+        showToast('图片大小不能超过 5MB', 'error')
+        input.value = ''
+        return
+    }
+
+    uploading.value = true
+    uploadProgress.value = '上传中...'
+    try {
+        const result = await uploadImage(file)
+        formData.image_url = result.url
+        uploadProgress.value = '上传完成 ✓'
+        showToast('图片上传成功', 'success')
+    } catch (err) {
+        console.error('上传失败:', err)
+        showToast('图片上传失败', 'error')
+        uploadProgress.value = ''
+    } finally {
+        uploading.value = false
+        input.value = ''
+        setTimeout(() => { uploadProgress.value = '' }, 2000)
+    }
 }
 
 async function handleFormSubmit() {
@@ -840,6 +870,7 @@ onMounted(async () => {
             </h2>
             <p v-if="showDraftOnly" class="page-subtitle">管理尚未完善的精灵草稿</p>
             <div class="header-actions" v-if="!showDraftOnly">
+                <span class="total-count-badge">共记录 {{ pets.length }} 只精灵</span>
                 <button class="btn-add" @click="openAddModal">
                     <span class="btn-add-icon">+</span>
                     添加精灵
@@ -1098,7 +1129,7 @@ onMounted(async () => {
                                     补
                                 </button>
                                 <button v-if="!(pet.group === '草稿' && !pet.is_active)" class="btn-action btn-edit" title="编辑" @click="openEditModal(pet)">
-                                    ✏️
+                                    编
                                 </button>
                                 <button
                                     v-if="!(pet.group === '草稿' && !pet.is_active)"
@@ -1107,7 +1138,7 @@ onMounted(async () => {
                                     :title="pet.is_active ? '下架' : '上架'"
                                     @click="handleToggleActive(pet)"
                                 >
-                                    {{ pet.is_active ? '📥' : '📤' }}
+                                    {{ pet.is_active ? '下' : '上' }}
                                 </button>
                                 <button
                                     v-if="!(pet.group === '草稿' && !pet.is_active) && !showDraftOnly"
@@ -1115,10 +1146,10 @@ onMounted(async () => {
                                     title="存草稿"
                                     @click="moveToDraft(pet)"
                                 >
-                                    📋
+                                    存
                                 </button>
                                 <button class="btn-action btn-delete" title="删除" @click="confirmDelete(pet)">
-                                    🗑️
+                                    删
                                 </button>
                             </div>
                         </td>
@@ -1155,6 +1186,13 @@ onMounted(async () => {
                         />
                         <div v-if="formData.image_url" class="image-preview">
                             <img :src="getFullUrl(formData.image_url)" alt="预览" class="preview-img" />
+                        </div>
+                        <div class="upload-row">
+                            <label class="upload-btn" :class="{ uploading }">
+                                <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" @change="handleFileSelect" />
+                                <span v-if="uploadProgress">{{ uploadProgress }}</span>
+                                <span v-else>📁 本地选择图片</span>
+                            </label>
                         </div>
                     </div>
 
@@ -1357,12 +1395,14 @@ onMounted(async () => {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid rgba(6, 182, 212, 0.15);
 }
 
 .page-title {
     font-size: 24px;
     font-weight: 800;
-    color: #1e293b;
+    color: #0f172a;
     letter-spacing: 1px;
     margin: 0;
 }
@@ -1377,10 +1417,10 @@ onMounted(async () => {
     font-size: 15px;
     font-weight: 700;
     color: #fff;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
     position: relative;
     overflow: hidden;
 }
@@ -1398,7 +1438,7 @@ onMounted(async () => {
 
 .btn-add:hover {
     transform: translateY(-3px);
-    box-shadow: 0 10px 28px rgba(99, 102, 241, 0.5);
+    box-shadow: 0 10px 28px rgba(37, 99, 235, 0.5);
 }
 
 .btn-add:hover::before {
@@ -1556,7 +1596,7 @@ onMounted(async () => {
     font-size: 13px;
     font-weight: 700;
     color: #1e293b;
-    border: 2px solid #6366f1;
+    border: 2px solid #f59e0b;
     border-radius: 6px;
     padding: 4px 8px;
     outline: none;
@@ -1711,17 +1751,17 @@ onMounted(async () => {
 }
 
 .attr-btn:hover {
-    border-color: #6366f1;
-    color: #6366f1;
+    border-color: #2563eb;
+    color: #2563eb;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
 }
 
 .attr-btn.active {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     color: #fff;
     border-color: transparent;
-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
 }
 
 .attr-icon-btn {
@@ -1815,10 +1855,10 @@ onMounted(async () => {
 }
 
 .btn-sort:hover {
-    border-color: #6366f1;
-    color: #6366f1;
+    border-color: #2563eb;
+    color: #2563eb;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
 }
 
 .btn-sort:active {
@@ -1826,10 +1866,10 @@ onMounted(async () => {
 }
 
 .btn-sort.active {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     color: #fff;
     border-color: transparent;
-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
 }
 
 .sort-buttons {
@@ -2038,13 +2078,19 @@ onMounted(async () => {
 }
 
 .attr-icon-sm {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
+    width: 26px;
+    height: 26px;
+    border-radius: 5px;
     object-fit: contain;
     background: #f8fafc;
     border: 1px solid rgba(0, 0, 0, 0.06);
     transition: all 0.2s ease;
+}
+
+.attr-icons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .pet-row:hover .attr-icon-sm {
@@ -2063,8 +2109,8 @@ onMounted(async () => {
     font-size: 14px;
     font-weight: 800;
     color: #fff;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    box-shadow: 0 2px 10px rgba(245, 158, 11, 0.3);
     transition: all 0.25s ease;
 }
 
@@ -2074,8 +2120,8 @@ onMounted(async () => {
 
 .price-tag.editable:hover {
     transform: scale(1.08);
-    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
-    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.45);
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
 }
 
 .price-cell {
@@ -2088,20 +2134,20 @@ onMounted(async () => {
     width: 70px;
     padding: 6px 12px;
     border-radius: 8px;
-    border: 2px solid #6366f1;
+    border: 2px solid #f59e0b;
     font-size: 14px;
     font-weight: 700;
     text-align: center;
     background: #fff;
     color: #1e293b;
     outline: none;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
     transition: all 0.2s ease;
 }
 
 .price-input:focus {
-    border-color: #8b5cf6;
-    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
+    border-color: #d97706;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.35);
 }
 
 .price-input::-webkit-outer-spin-button,
@@ -2148,50 +2194,132 @@ onMounted(async () => {
 }
 
 .btn-action {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    border: none;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: transparent;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+    gap: 4px;
+    padding: 6px 12px;
+    min-width: 32px;
+}
+
+.btn-action::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-action:hover::before {
+    left: 100%;
 }
 
 .btn-action:hover {
-    transform: translateY(-2px) scale(1.1);
+    transform: translateY(-2px);
 }
 
 .btn-action:active {
-    transform: translateY(-2px) scale(0.95);
+    transform: translateY(-1px) scale(0.97);
+}
+
+.btn-edit {
+    color: #fff;
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+    box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3);
 }
 
 .btn-edit:hover {
-    background: rgba(59, 130, 246, 0.12);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+    box-shadow: 0 6px 18px rgba(6, 182, 212, 0.45);
+}
+
+.btn-online {
+    color: #fff;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
 .btn-online:hover {
-    background: rgba(16, 185, 129, 0.12);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+}
+
+.btn-offline {
+    color: #fff;
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+    box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3);
 }
 
 .btn-offline:hover {
-    background: rgba(245, 158, 11, 0.12);
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+    box-shadow: 0 6px 18px rgba(6, 182, 212, 0.45);
+}
+
+.total-count-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    background: rgba(255, 255, 255, 0.65);
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(226, 232, 240, 0.5);
+    backdrop-filter: blur(4px);
+    white-space: nowrap;
+}
+
+.btn-draft-move {
+    color: #fff;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.btn-draft-move:hover {
+    box-shadow: 0 6px 18px rgba(245, 158, 11, 0.45);
+}
+
+.btn-delete {
+    color: #fff;
+    background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+    box-shadow: 0 2px 8px rgba(248, 113, 113, 0.3);
 }
 
 .btn-delete:hover {
-    background: rgba(239, 68, 68, 0.12);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+    box-shadow: 0 6px 18px rgba(248, 113, 113, 0.45);
+}
+
+.btn-complete {
+    color: #fff;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
 }
 
 .btn-complete:hover {
-    background: rgba(245, 158, 11, 0.12);
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+    box-shadow: 0 6px 18px rgba(245, 158, 11, 0.45);
+}
+
+.btn-complete:hover .btn-action,
+.btn-draft-move:hover .btn-action,
+.btn-delete:hover .btn-action,
+.btn-edit:hover .btn-action {
+    transform: none;
+}
+
+.action-buttons {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
 .btn-finish {
@@ -2211,11 +2339,6 @@ onMounted(async () => {
     background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
     box-shadow: 0 6px 18px rgba(245, 158, 11, 0.45) !important;
     transform: translateY(-2px) scale(1.05) !important;
-}
-
-.btn-draft-move:hover {
-    background: rgba(245, 158, 11, 0.12) !important;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25) !important;
 }
 
 /* ======== 弹窗 ======== */
@@ -2569,6 +2692,43 @@ onMounted(async () => {
     object-fit: cover;
     border: 2px solid rgba(99, 102, 241, 0.15);
     background: #f1f5f9;
+}
+
+.upload-row {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+}
+
+.upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    background: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.upload-btn:hover {
+    border-color: #2563eb;
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.04);
+}
+
+.upload-btn.uploading {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.upload-btn input[type="file"] {
+    display: none;
 }
 
 .attr-select-grid {

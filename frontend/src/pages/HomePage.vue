@@ -922,10 +922,12 @@ body {
   opacity: 0;
   transform: translateY(40px) scale(0.6);
   animation: charRevealSpring 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-  transition: transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1),
-              letter-spacing 0.7s cubic-bezier(0.22, 0.61, 0.36, 1),
-              filter 0.6s ease;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              letter-spacing 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              text-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform;
+  cursor: default;
 }
 
 .title-char::before {
@@ -935,15 +937,17 @@ body {
   left: 0;
   color: transparent;
   background: linear-gradient(135deg,
-    rgba(6, 182, 212, 0.4) 0%,
-    rgba(56, 189, 248, 0.3) 30%,
-    rgba(192, 132, 252, 0.4) 60%,
-    rgba(6, 182, 212, 0.35) 100%);
+    rgba(6, 182, 212, 0.5) 0%,
+    rgba(56, 189, 248, 0.4) 25%,
+    rgba(168, 85, 247, 0.5) 50%,
+    rgba(236, 72, 153, 0.4) 75%,
+    rgba(6, 182, 212, 0.45) 100%);
   background-clip: text;
   -webkit-background-clip: text;
-  filter: blur(12px);
+  filter: blur(8px);
   opacity: 0;
-  transition: opacity 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
   z-index: -1;
 }
@@ -959,12 +963,12 @@ body {
     opacity: 0;
     transform: translateY(40px) scale(0.6);
   }
-  60% {
+  55% {
     opacity: 1;
-    transform: translateY(-8px) scale(1.08);
+    transform: translateY(-10px) scale(1.1);
   }
-  80% {
-    transform: translateY(3px) scale(0.98);
+  75% {
+    transform: translateY(4px) scale(0.97);
   }
   100% {
     opacity: 1;
@@ -972,26 +976,89 @@ body {
   }
 }
 
+/* ======== GSAP风格丝滑悬浮动画 ======== */
+
 .header-title:hover .title-char {
-  transform: translateY(-6px) scale(1.06);
-  letter-spacing: 9px;
+  transform: translateY(-4px) scale(1.04);
+  letter-spacing: 6px;
 }
 
 .header-title:hover {
-  filter: drop-shadow(0 0 16px rgba(6, 182, 212, 0.15))
-          drop-shadow(0 0 36px rgba(168, 85, 247, 0.1));
+  filter: drop-shadow(0 0 20px rgba(6, 182, 212, 0.2))
+          drop-shadow(0 0 40px rgba(168, 85, 247, 0.15))
+          drop-shadow(0 0 60px rgba(236, 72, 153, 0.1));
 }
 
+/* 单个字符悬浮 - 使用GSAP风格的power3.out曲线 */
 .title-char:hover {
-  transform: translateY(-8px) scale(1.14) !important;
-  letter-spacing: 10px !important;
-  filter: drop-shadow(0 0 6px rgba(6, 182, 212, 0.45))
-          drop-shadow(0 0 16px rgba(168, 85, 247, 0.25));
+  transform: translateY(-10px) scale(1.12) !important;
+  letter-spacing: 8px !important;
+  text-shadow:
+    0 0 20px rgba(6, 182, 212, 0.6),
+    0 0 40px rgba(56, 189, 248, 0.4),
+    0 0 60px rgba(168, 85, 247, 0.3),
+    0 0 80px rgba(236, 72, 153, 0.2);
+  filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.5))
+          drop-shadow(0 0 20px rgba(168, 85, 247, 0.35));
 }
 
 .title-char:hover::before {
-  opacity: 0.7;
-  filter: blur(14px);
+  opacity: 0.85;
+  filter: blur(10px);
+}
+
+/* 相邻字符的联动效果 - 营造波浪感 */
+.title-char:has(+ .title-char:hover),
+.title-char:hover + .title-char {
+  transform: translateY(-4px) scale(1.06) !important;
+  letter-spacing: 6px !important;
+  text-shadow:
+    0 0 12px rgba(6, 182, 212, 0.35),
+    0 0 24px rgba(168, 85, 247, 0.2);
+}
+
+/* 次相邻字符的轻微联动 */
+.title-char:has(+ .title-char + .title-char:hover),
+.title-char:hover + .title-char + .title-char {
+  transform: translateY(-1px) scale(1.02) !important;
+  text-shadow:
+    0 0 8px rgba(6, 182, 212, 0.2);
+}
+
+/* 标题整体光晕层 */
+.header-title::after {
+  content: '';
+  position: absolute;
+  inset: -30px -50px;
+  border-radius: 80px;
+  background: radial-gradient(ellipse at center,
+    rgba(6, 182, 212, 0.08) 0%,
+    rgba(56, 189, 248, 0.05) 30%,
+    rgba(168, 85, 247, 0.06) 50%,
+    rgba(236, 72, 153, 0.04) 70%,
+    transparent 100%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: -2;
+}
+
+.header-title:hover::after {
+  opacity: 1;
+}
+
+/* 光晕呼吸动画 */
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.title-char:hover::before {
+  animation: glowPulse 2s ease-in-out infinite;
 }
 
 .header-subtitle {

@@ -29,6 +29,7 @@ export interface Message {
   id: number
   nickname: string
   content: string
+  avatar_index: number
   is_read: boolean
   created_at: string
 }

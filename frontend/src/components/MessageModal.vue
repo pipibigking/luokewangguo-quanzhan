@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { getMessages, createMessage } from '@/api'
+import { getMessages, createMessage, getMessageAvatars } from '@/api'
 import type { Message } from '@/types'
 
 const props = defineProps<{ visible: boolean }>()
@@ -22,7 +22,8 @@ let toastTimer: number | null = null
 let cooldownAnimId = 0
 const listRef = ref<HTMLElement | null>(null)
 
-const avatars = [
+const avatars = ref<{ name: string; src: string }[]>([])
+const builtinAvatarFallback = [
     { name: '迪莫', src: '/images/avatar/迪莫.jpg' },
     { name: '火花', src: '/images/avatar/火花.jpg' },
     { name: '菊花梨', src: '/images/avatar/菊花梨.jpg' },
@@ -31,7 +32,22 @@ const avatars = [
     { name: '鸭吉吉', src: '/images/avatar/鸭吉吉.jpg' }
 ]
 
-const selectedAvatar = ref(0)
+async function loadAvatars() {
+    try {
+        const data = await getMessageAvatars()
+        const allAvatars = [...data.builtin.map((a: any) => ({ name: a.name, src: a.url })), ...data.custom.map((a: any) => ({ name: a.name, src: a.url }))]
+        avatars.value = allAvatars.length > 0 ? allAvatars : builtinAvatarFallback
+    } catch {
+        avatars.value = builtinAvatarFallback
+    }
+}
+
+const selectedAvatar = ref(Number(localStorage.getItem('selectedAvatar') || '0'))
+const showAvatarPicker = ref(false)
+
+watch(selectedAvatar, (v) => {
+    localStorage.setItem('selectedAvatar', String(v))
+})
 
 function showToast(msg: string, type: 'success' | 'error' = 'success') {
     toast.value = msg
@@ -66,7 +82,7 @@ async function handleSend() {
 
     submitting.value = true
     try {
-        await createMessage(nick, msg)
+        await createMessage(nick, msg, selectedAvatar.value)
         content.value = ''
         showToast('留言已发送 ✨', 'success')
         startCooldown()
@@ -130,13 +146,14 @@ function fmtTime(dateStr: string): string {
     return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function handleOverlayClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) emit('close')
+function handleOverlayClick() {
+    // 仅保留右上角×按钮关闭，点击遮罩不关闭
 }
 
 watch(() => props.visible, (v) => {
     if (v) {
         loadMessages()
+        loadAvatars()
         const savedEnd = localStorage.getItem(COOLDOWN_KEY)
         if (savedEnd) {
             resumeCooldown(Number(savedEnd))
@@ -195,7 +212,7 @@ onUnmounted(() => {
                     class="msg-bubble"
                 >
                     <div class="msg-bubble-avatar">
-                        <img :src="avatars[msg.id % avatars.length].src" :alt="msg.nickname">
+                        <img :src="(avatars[msg.avatar_index >= 0 ? msg.avatar_index : (msg.id % 6)] || avatars[0])?.src" :alt="msg.nickname">
                     </div>
                     <div class="msg-bubble-body">
                         <div class="msg-bubble-head">
@@ -212,7 +229,7 @@ onUnmounted(() => {
                     <span class="avatar-label">选择头像：</span>
                     <div class="avatar-options">
                         <button
-                            v-for="(avatar, index) in avatars"
+                            v-for="(avatar, index) in avatars.slice(0, 6)"
                             :key="index"
                             class="avatar-btn"
                             :class="{ active: selectedAvatar === index }"
@@ -221,9 +238,15 @@ onUnmounted(() => {
                         >
                             <img :src="avatar.src" :alt="avatar.name">
                         </button>
+                        <button v-if="avatars.length > 6" class="avatar-btn avatar-more-btn" @click="showAvatarPicker = true" title="更多头像">
+                            <span>+</span>
+                        </button>
                     </div>
                 </div>
                 <div class="msg-input-row">
+                    <div class="selected-avatar-preview">
+                        <img :src="avatars[selectedAvatar]?.src" :alt="avatars[selectedAvatar]?.name" />
+                    </div>
                     <input
                         v-model="nickname"
                         type="text"
@@ -269,6 +292,29 @@ onUnmounted(() => {
                             {{ cooldown }}s
                         </span>
                         <span v-else>发送留言</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 头像选择弹窗 -->
+        <div v-if="showAvatarPicker" class="picker-overlay" @click="showAvatarPicker = false">
+            <div class="picker-dialog" @click.stop>
+                <div class="picker-header">
+                    <h3>选择头像</h3>
+                    <button class="picker-close" @click="showAvatarPicker = false">×</button>
+                </div>
+                <div class="picker-grid">
+                    <button
+                        v-for="(avatar, index) in avatars"
+                        :key="index"
+                        class="picker-btn"
+                        :class="{ active: selectedAvatar === index }"
+                        @click="selectedAvatar = index; showAvatarPicker = false"
+                        :title="avatar.name"
+                    >
+                        <img :src="avatar.src" :alt="avatar.name">
+                        <span class="picker-name">{{ avatar.name }}</span>
                     </button>
                 </div>
             </div>
@@ -619,6 +665,22 @@ onUnmounted(() => {
     margin-bottom: 10px;
 }
 
+.selected-avatar-preview {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.selected-avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 .msg-nick-input {
     flex: 1;
     padding: 10px 14px;
@@ -837,5 +899,162 @@ onUnmounted(() => {
     stroke-linecap: round;
     stroke-dasharray: 62.83;
     transition: stroke-dashoffset 0.3s linear;
+}
+
+/* ======== 更多头像按钮 ======== */
+.avatar-more-btn {
+    border: 2px dashed rgba(255,255,255,0.3) !important;
+    background: rgba(255,255,255,0.05) !important;
+    opacity: 0.7 !important;
+    font-size: 20px;
+    font-weight: 300;
+    color: #94a3b8;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-more-btn:hover {
+    opacity: 1 !important;
+    border-color: #38bdf8 !important;
+    color: #38bdf8 !important;
+    background: rgba(56,189,248,0.1) !important;
+}
+
+.avatar-more-btn span {
+    line-height: 1;
+}
+
+/* ======== 头像选择弹窗 ======== */
+.picker-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 15, 37, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    animation: overlayFadeIn 0.2s ease;
+}
+
+@keyframes overlayFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.picker-dialog {
+    background: #1e293b;
+    border-radius: 20px;
+    padding: 28px;
+    width: 520px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    animation: dialogPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes dialogPopIn {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.picker-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin: 0;
+}
+
+.picker-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: transparent;
+    color: #94a3b8;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.picker-close:hover {
+    background: rgba(239,68,68,0.6);
+    color: #fff;
+    border-color: transparent;
+}
+
+.picker-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.picker-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 8px;
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.picker-btn:hover {
+    border-color: #38bdf8;
+    background: rgba(56,189,248,0.1);
+    transform: translateY(-2px);
+}
+
+.picker-btn.active {
+    border-color: #06b6d4;
+    background: rgba(6,182,212,0.2);
+    box-shadow: 0 0 0 2px rgba(6,182,212,0.3);
+}
+
+.picker-btn img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.picker-name {
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.picker-btn.active .picker-name {
+    color: #06b6d4;
+}
+
+.picker-dialog::-webkit-scrollbar {
+    width: 4px;
+}
+
+.picker-dialog::-webkit-scrollbar-thumb {
+    background: rgba(99,102,241,0.3);
+    border-radius: 2px;
 }
 </style>

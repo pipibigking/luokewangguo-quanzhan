@@ -326,12 +326,14 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid rgba(6, 182, 212, 0.15);
 }
 
 .page-title {
     font-size: 24px;
     font-weight: 800;
-    color: #1e293b;
+    color: #0f172a;
     letter-spacing: 1px;
     margin: 0;
 }

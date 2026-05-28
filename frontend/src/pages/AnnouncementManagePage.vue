@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getAnnouncement, updateAnnouncement } from '@/api'
+import { getAnnouncement, updateAnnouncement, getSiteConfig, updateSiteConfig } from '@/api'
 import type { Announcement } from '@/types'
 import { createParticleBurst } from '@/utils/particleEffect'
 
@@ -63,7 +63,7 @@ function handleSaveClick(e: MouseEvent) {
     handleSave()
 }
 
-// 作者信息 - 可编辑
+// 作者信息 - 可编辑（已持久化到数据库）
 interface AuthorInfo {
     author: string
     project: string
@@ -89,20 +89,44 @@ const defaultInfo: AuthorInfo = {
 const authorInfo = ref<AuthorInfo>({ ...defaultInfo })
 const editingInfo = ref(false)
 
-function loadAuthorInfo() {
+function mapConfigToInfo(config: Record<string, string>): AuthorInfo {
+    return {
+        author: config['author_name'] || defaultInfo.author,
+        project: config['project_name'] || defaultInfo.project,
+        version: config['version'] || defaultInfo.version,
+        tech: config['tech_stack'] || defaultInfo.tech,
+        github: config['github_url'] || defaultInfo.github,
+        email: config['email'] || defaultInfo.email,
+        qq: config['qq'] || defaultInfo.qq,
+        phone: config['phone'] || defaultInfo.phone
+    }
+}
+
+function mapInfoToConfig(info: AuthorInfo): Record<string, string> {
+    return {
+        'author_name': info.author,
+        'project_name': info.project,
+        'version': info.version,
+        'tech_stack': info.tech,
+        'github_url': info.github,
+        'email': info.email,
+        'qq': info.qq,
+        'phone': info.phone
+    }
+}
+
+async function loadAuthorInfo() {
     try {
-        const saved = localStorage.getItem('announcement_author_info')
-        if (saved) {
-            authorInfo.value = { ...defaultInfo, ...JSON.parse(saved) }
-        }
+        const config = await getSiteConfig()
+        authorInfo.value = mapConfigToInfo(config)
     } catch {
         authorInfo.value = { ...defaultInfo }
     }
 }
 
-function saveAuthorInfo() {
+async function saveAuthorInfo() {
     try {
-        localStorage.setItem('announcement_author_info', JSON.stringify(authorInfo.value))
+        await updateSiteConfig(mapInfoToConfig(authorInfo.value))
         editingInfo.value = false
         showSuccessToast('作者信息保存成功！')
     } catch {
@@ -110,11 +134,15 @@ function saveAuthorInfo() {
     }
 }
 
-function resetAuthorInfo() {
+async function resetAuthorInfo() {
     authorInfo.value = { ...defaultInfo }
-    localStorage.removeItem('announcement_author_info')
-    editingInfo.value = false
-    showSuccessToast('已恢复默认信息')
+    try {
+        await updateSiteConfig(mapInfoToConfig(defaultInfo))
+        editingInfo.value = false
+        showSuccessToast('已恢复默认信息')
+    } catch {
+        showSuccessToast('恢复失败')
+    }
 }
 
 onMounted(() => {
@@ -281,13 +309,15 @@ onMounted(() => {
     align-items: baseline;
     gap: 16px;
     margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid rgba(6, 182, 212, 0.15);
     flex-wrap: wrap;
 }
 
 .page-title {
     font-size: 24px;
-    font-weight: 700;
-    color: #1e293b;
+    font-weight: 800;
+    color: #0f172a;
     margin: 0;
 }
 

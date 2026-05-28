@@ -6,7 +6,6 @@ import type { Announcement } from '@/types'
 const announcement = ref<Announcement | null>(null)
 const expanded = ref(false)
 const needExpand = ref(false)
-const textRef = ref<HTMLElement | null>(null)
 
 const displayContent = computed(() => {
     if (!announcement.value?.content) return ''
